@@ -1,0 +1,115 @@
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from tqdm import tqdm
+from dataset import OsuFramesDataset
+import torchvision.transforms as transforms
+from torchvision.models import resnet18
+transform = transforms.ToTensor()
+
+
+class Net(nn.Module):
+    def __init__(self, dimensions):
+        super().__init__()
+        self.d = dimensions
+        self.conv1 = nn.Conv2d(
+            1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv2 = nn.Conv2d(
+            64, 64, kernel_size=3, stride=2, padding=3, bias=False)
+        self.conv3 = nn.Conv2d(
+            64, 64, kernel_size=3, stride=2, padding=3, bias=False)
+        self.conv4 = nn.Conv2d(
+            64, 64, kernel_size=3, stride=2, padding=3, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self._lin = self._calc_linear_size()
+        self.fc1 = nn.Linear(self._lin, 512)
+        self.fc2 = nn.Linear(512, 4)
+
+    def _calc_linear_size(self):
+        rand = torch.randn(self.d[0], self.d[1]
+                           ).view(-1, 1, self.d[0], self.d[1])
+        ret = self.convs(rand).shape
+        return ret[1] * ret[2] * ret[3]
+
+    def convs(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.conv4(self.conv3(self.conv2(x)))
+
+        x = self.avgpool(x)
+        return x
+
+    def forward(self, x: torch.Tensor):
+
+        x = self.convs(x)
+
+        x = x.view(-1, self._lin)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+
+def Train(project_name: str, force_rebuild=False, batch_size=8, epochs=10, dimensions=(int(540 / 2), int(960 / 2))):
+
+    device = torch.device(
+        'cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+
+    osu_dataset = OsuFramesDataset(project_name=project_name,
+                                   force_rebuild=force_rebuild)
+
+    train_data = osu_dataset.data
+    train_results = osu_dataset.results
+
+    net = Net(dimensions=dimensions).to(device)
+
+    optimzer = optim.Adam(net.parameters(), lr=0.001)
+    loss_function = nn.MSELoss()
+
+    VAL_PCT = 0.6
+    val_size = int(len(train_data)*VAL_PCT)
+
+    results_tensor = torch.Tensor(train_results).to(device)
+    train_x = train_data[:-val_size]
+    train_y = results_tensor[:-val_size]
+
+    print('Training using {} data'.format(len(train_x)))
+
+    test_x = train_data[-val_size:]
+    test_y = results_tensor[-val_size:]
+
+    for epoch in range(epochs):
+        for i in tqdm(range(0, len(train_x), batch_size)):
+
+            batch_x = transform(train_x[i:i +
+                                        batch_size]).view(-1, 1, dimensions[0], dimensions[1]).to(device)
+
+            batch_y = train_y[i:i+batch_size]
+
+            net.zero_grad()
+
+            outputs = net(batch_x)
+            loss = loss_function(outputs, batch_y)
+            loss.backward()
+            optimzer.step()
+
+    print("LOSS", loss)
+
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for i in range(10):
+            x = i + 30
+            print("ACTUAL:", train_y[x], 'PREDICTED:', net(transform(
+                train_x[x]).view(-1, 1, dimensions[0], dimensions[1]).to(device)))
+
+
+Train('osu')
