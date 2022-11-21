@@ -1,113 +1,207 @@
-
-
-import torchvision.transforms
-import torch
-from os import getcwd, listdir, path
 import re
+from os import getcwd, listdir, path
 import cv2
 import numpy as np
-
-from re import Match
-
+import torch
 import torchvision.transforms as transforms
+from tqdm import tqdm
+
+from windows import derive_capture_params
 
 trans = transforms.ToTensor()
 
+KEY_STATES = {
+    "00": 0,
+    "01": 1,
+    "10": 2,
+}
+
+BUTTON_CLICKED_COLOR = np.array([254, 254, 220])
+PLAY_AREA_CAPTURE_PARAMS = derive_capture_params()
+FINAL_RESIZE_PERCENT = 0.3
+
+
+def get_button_cell_color(img):
+    return img[0][0]
+
+
+def get_button_press_dist(button):
+    return np.linalg.norm(get_button_cell_color(
+        button) - BUTTON_CLICKED_COLOR)
+
+
+# stores the key data for the last processed frame (assumes all input is sequential)
+delta_storage = {}
+# 0 = no change, -1 = decreasing, 1 = increasing
+
+
+def get_press_state(unique_id, button):
+    global delta_storage
+    current_distance = get_button_press_dist(button)
+
+    if delta_storage.get(unique_id, None) is None:
+        delta_storage[unique_id] = [get_button_press_dist(button), 0]
+
+    old_distance, old_dir = delta_storage.get(unique_id)
+
+    diff = current_distance - old_distance
+    current_dir = 1 if diff > 0 else (-1 if diff < 0 else 0)
+
+    delta_storage[unique_id] = [current_distance, current_dir]
+
+    if current_dir == 0 and current_distance < 80:
+        return 1
+
+    if current_dir > 0:  # and old_dir <= 0:
+        return 0
+
+    if current_dir < 0:  # and old_dir > 0:
+        return 1
+
+    return 0
+
+
+def extract_data_from_image(image_path):
+    BUTTON_CAPTURE_HEIGHT = 75
+    BUTTON_CAPTURE_WIDTH = 46
+    global delta_storage
+
+    osu_screenshot = cv2.imread(image_path, cv2.IMREAD_COLOR)
+
+    osu_buttons = osu_screenshot[960:960 +
+                                 BUTTON_CAPTURE_HEIGHT, 1760:1760+(BUTTON_CAPTURE_WIDTH * 2)].copy()
+
+    half_b_h = int((BUTTON_CAPTURE_HEIGHT / 2))
+    half_b_w = int((BUTTON_CAPTURE_WIDTH / 2))
+
+    capture_area_l = 10
+
+    osu_left_button = osu_buttons[half_b_h - capture_area_l:half_b_h +
+                                  capture_area_l, half_b_w - capture_area_l:half_b_w + capture_area_l]
+    osu_right_button = osu_buttons[half_b_h - capture_area_l:half_b_h + capture_area_l, half_b_w +
+                                   BUTTON_CAPTURE_WIDTH - capture_area_l:half_b_w + BUTTON_CAPTURE_WIDTH + capture_area_l]
+
+    osu_play_area = osu_screenshot[PLAY_AREA_CAPTURE_PARAMS[3]:PLAY_AREA_CAPTURE_PARAMS[3] + PLAY_AREA_CAPTURE_PARAMS[1],
+                                   PLAY_AREA_CAPTURE_PARAMS[2]:PLAY_AREA_CAPTURE_PARAMS[2]+PLAY_AREA_CAPTURE_PARAMS[0]].copy()
+
+    left_press_state, right_press_state = int(get_press_state('left',
+                                                              osu_left_button)), int(get_press_state('right', osu_right_button))
+
+    osu_play_area = cv2.resize(osu_play_area, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+        PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
+
+    key_state = KEY_STATES.get(
+        f"{left_press_state}{right_press_state}", "invalid")
+
+    # print(get_button_cell_color(osu_left_button),
+    #       get_button_cell_color(osu_right_button), f"{left_press_state}{right_press_state}", delta_storage_snapshot, delta_storage)
+    # cv2.imshow(
+    #     f"debug", osu_screenshot)
+    # cv2.waitKey(1)
+
+    if key_state == 'invalid':
+        delta_storage = {}
+        return None
+
+    return [osu_play_area, key_state]
+
 
 class OsuDataset(torch.utils.data.Dataset):
-    IMG_SIZE = (960, 540)
 
     def __init__(self, project_name: str, use_clicks=True, force_rebuild=False) -> None:
         self.project_path = path.normpath(
             path.join(getcwd(), 'data', 'raw', project_name))
-        print(self.project_path)
         self.processed_data_path = path.normpath(path.join(
-            getcwd(), 'data', 'processed', f"{project_name}_data.npy"))
-        self.processed_clicks_results_path = path.normpath(path.join(
-            getcwd(), 'data', 'processed', f"{project_name}_clicks_results.npy"))
-        self.processed_position_results_path = path.normpath(path.join(
-            getcwd(), 'data', 'processed', f"{project_name}_position_results.npy"))
-        self.data = []
+            getcwd(), 'data', 'processed', f"{project_name}.npy"))
+        self.images = []
         self.results = []
-        self.results_to_load = self.processed_clicks_results_path if use_clicks else self.processed_position_results_path
-        if not force_rebuild and path.exists(self.processed_data_path) and path.exists(self.results_to_load):
-            self.data = np.load(
+
+        if not force_rebuild and path.exists(self.processed_data_path):
+            images, results = np.load(
                 self.processed_data_path, allow_pickle=True)
-            self.results = np.load(
-                self.results_to_load, allow_pickle=True)
+
+            self.images = images
+            self.results = results
 
         else:
             self.make_training_data()
 
     def make_training_data(self):
+        global delta_storage
+
         print('Generating data')
-        click_0 = []
-        click_1 = []
-        clicks = []
-        positions = []
-        for img_path in listdir(self.project_path):
+
+        delta_storage = {}
+
+        images = listdir(self.project_path)
+
+        images.sort(key=lambda x: int(
+            re.search(r"(?:[a-zA-Z]?)([0-9]+).png", x).groups()[0]))
+
+        for img_path in tqdm(images):
             try:
-                match: Match = re.match(
-                    r"([a-z0-9-]+)_([0-9.]+)_([0-9.]+)_([0-9.]+)_([0-1])_([0-1])", img_path)
-                if not match:
-                    raise Exception("Failed To Match File {}".format(img_path))
 
-                project, idx, x, y, k1, k2 = match.groups()
-                img = cv2.imread(path.normpath(path.join(
-                    self.project_path, img_path)), cv2.IMREAD_COLOR)
-                self.data.append(np.array(img))
-                clicks.append(
-                    np.array([max(float(k1), float(k2))]))
+                result = extract_data_from_image(
+                    path.normpath(path.join(self.project_path, img_path)))
 
-                if max(float(k1), float(k2)) > 0.5:
-                    click_1.append([project, idx, x, y, k1, k2])
-                else:
-                    click_0.append([project, idx, x, y, k1, k2])
+                if result is None:
+                    continue
 
-                positions.append([float(x), float(y)])
+                image, action = result
+
+                self.results.append(action)
+                self.images.append(trans(image).numpy())
+
+                # cv2.imshow("Test", image)
+                # cv2.waitKey(0)
 
             except Exception as e:
                 print('ERROR WHILE LOADING', img_path, e)
 
-        print('READ IN {} Clicks, and {} None Clicks'.format(
-            len(click_1), len(click_0)))
-        diff = len(click_1) - len(click_0)
-        if abs(diff) > 100:
-            delta = abs(diff)
-            print('Balancing Clicks Due To Difference Of {}'.format(delta))
-            group_to_duplicate = click_0 if diff > 1 else click_1
-            group_len = len(group_to_duplicate)
-            wraps = 1
-            for i in range(delta):
-                if i % group_len == 0 and i != 0:
-                    wraps += 1
+        # frame offset to account for replay/auto keyoverlay delay, should convert to parameter later
+        frame_latency = 3
+        for i in range(frame_latency):
+            self.results.pop(0)
+            self.images.pop()
 
-                project, idx, x, y, k1, k2 = group_to_duplicate[i % group_len]
-                original_file = path.normpath(path.join(
-                    self.project_path, '{}_{}_{}_{}_{}_{}.png'.format(project, idx, x, y, k1, k2)))
-                new_file = path.normpath(path.join(
-                    self.project_path, '{}_{}{}_{}_{}_{}_{}.png'.format(project, "0"*wraps, idx, x, y, k1, k2)))
-                cv2.imwrite(new_file, cv2.imread(
-                    original_file, cv2.IMREAD_COLOR))
+        # old balancing code
+        # classes_count = {}
 
-            self.data = []
-            self.results = []
-            print('Done Balancing, Retrying Data Import')
-            self.make_training_data()
-            return
+        # for img_path in tqdm(images):
+        #     try:
 
-        print('Saving')
-        np.save(self.processed_data_path, self.data)
-        np.save(self.processed_clicks_results_path, clicks)
-        np.save(self.processed_position_results_path, positions)
+        #         result = extract_data_from_image(
+        #             path.normpath(path.join(self.project_path, img_path)))
 
-        self.data = np.load(
-            self.processed_data_path, allow_pickle=True)
-        self.results = np.load(
-            self.results_to_load, allow_pickle=True)
+        #         if result is None:
+        #             continue
+
+        #         image, action = result
+
+        #         if action not in classes_count.keys():
+        #             classes_count[action] = []
+        #         classes_count[action].append(image)
+
+        #     except Exception as e:
+        #         print('ERROR WHILE LOADING', img_path, e)
+
+        # largest = max(list(map(lambda x: len(x), classes_count.values())))
+
+        # for label, data in classes_count.items():
+        #     total = len(data)
+        #     if total < largest:
+        #         for i in tqdm(range(largest - total), f'Balancing Class {label}'):
+        #             classes_count[label].append(data[i % total])
+
+        # for label, data in classes_count.items():
+        #     for image in data:
+        #         self.results.append(label)
+        #         self.images.append(trans(image).numpy())
+
+        np.save(self.processed_data_path, [self.images, self.results])
 
     def __getitem__(self, idx):
-        return trans(self.data[idx]), self.results[idx]
+        return self.images[idx], self.results[idx]
 
     def __len__(self):
-        return len(self.data)
+        return len(self.images)

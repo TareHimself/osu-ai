@@ -1,3 +1,6 @@
+import time
+from os import path
+import cv2
 import numpy as np
 import torch
 import torch.nn as nn
@@ -6,91 +9,99 @@ import torch.optim as optim
 from tqdm import tqdm
 from dataset import OsuDataset
 import torchvision.transforms as transforms
-from torchvision.models import resnet18
+from models import ClicksNet, MouseNet
+from torch.utils.data import DataLoader
 transform = transforms.ToTensor()
 
 device = torch.device(
     'cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
 
-def numpyToTensor(arr, d):
-    print(arr.shape)
-    return transform(arr)
-    print(arr.shape)
-    Tn = torch.Tensor(d[0], d[1])
-    Ts = torch.stack([Tn, Tn, Tn]).unsqueeze(0)
-    print(Ts.shape)
-    return Ts
+def Train(project_name: str, force_rebuild=False, checkpoint_path=None, save_path="model.ptf", batch_size=4, epochs=1, learning_rate=0.0001):
 
+    train_set = OsuDataset(project_name=project_name)  # , force_rebuild=True)
 
-class Net(nn.Module):
-    def __init__(self, dimensions):
-        super().__init__()
-        self.d = dimensions
-        # self.conv = resnet18().to(device)
-        self.conv = resnet18(pretrained=True).to(device)
-        for param in self.conv.parameters():
-            param.requires_grad = False
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        self._lin = None
-        self.fc1 = None
-        self.fc2 = nn.Linear(1024, 4)
+    # image = train_set[0][0]
+    # print(image.shape,image)
 
-    def _calc_linear_size(self, val):
-        ret = val.shape
-        return ret[1]
+    # print(np.transpose(train_set[0][0],(3,270,280)).shape)
 
-    def convs(self, x: torch.Tensor) -> torch.Tensor:
-        return self.conv(x)
-
-    def forward(self, x: torch.Tensor):
-
-        x = self.convs(x)
-        if self._lin is None:
-            self._lin = self._calc_linear_size(x)
-            self.fc1 = nn.Linear(self._lin, 1024).to(device)
-        x = x.view(-1, self._lin)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
-
-
-def Train(project_name: str, force_rebuild=False, batch_size=4, epochs=15, dimensions=(int(540 / 2), int(960 / 2))):
-
-    train_set = OsuDataset(project_name=project_name)
-
-    osu_data_loader = torch.utils.data.DataLoader(
+    osu_data_loader = DataLoader(
         train_set,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=True
     )
 
-    net = Net(dimensions=dimensions).to(device)
+    print(train_set[0][0].shape, train_set[1000:1050][1])
 
-    optimzer = optim.Adam(net.parameters(), lr=0.001)
-    loss_function = nn.MSELoss()
+    model = ClicksNet().to(device)
+
+    if checkpoint_path:
+        try:
+            data = torch.load(checkpoint_path)
+            model.load_state_dict(data['model'])
+        except:
+            pass
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     for epoch in range(epochs):
-        running_loss = 0.0
-        for i, sample in tqdm(enumerate(osu_data_loader, 0)):
-            data, result = sample
+        loading_bar = tqdm(total=len(osu_data_loader))
+        total_accu, total_count = 0, 0
+        for idx, data in enumerate(osu_data_loader):
+            images, results = data
+            images = images.to(device)
+            results = results.type(torch.LongTensor).to(device)
 
-            net.zero_grad()
-            outputs = net(data.to(device))
-            loss = loss_function(outputs.float(), result.to(device).float())
+            optimizer.zero_grad()
+
+            outputs = model(images)
+
+            loss = criterion(outputs, results)
+
             loss.backward()
-            optimzer.step()
+            optimizer.step()
+            total_accu += (outputs.argmax(1) == results).sum().item()
+            total_count += results.size(0)
+            loading_bar.set_description_str(
+                f'Training {project_name} :: epoch {epoch + 1}/{epochs} ::  Accuracy {((total_accu / total_count) * 100):.4f} :: loss {loss.item():.4f} :')
+            loading_bar.update()
+        loading_bar.close()
 
-    print("LOSS", loss)
+    data = {
+        'state': model.state_dict()
+    }
 
-    correct = 0
-    total = 0
-
-    with torch.no_grad():
-        for i in range(10):
-            x = i + 30
-            print("ACTUAL:", train_set.results[x], 'PREDICTED:', net(
-                torch.stack([transform(train_set.data[x])]).to(device)))
+    torch.save(data, save_path)
 
 
-Train('osu-rgb')
+def test(model_path=None, image=""):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = ClicksNet()
+    model.to(device)
+    model.load_state_dict(torch.load(model_path)['state'])
+    model.eval()
+
+    cv_image = cv2.imread(image, cv2.IMREAD_COLOR)
+
+    start = time.time()
+    image = transform(np.array(cv_image)).reshape(
+        (1, 3, 270, 480)).to(device)
+
+    output = model(image)
+
+    _, predicated = torch.max(output, dim=1)
+
+    end = time.time()
+
+    probs = torch.softmax(output, dim=1)
+    prob = probs[0][predicated.item()]
+
+    return prob.item(), predicated.item(), end - start
+
+
+Train('body-floating-5.77', checkpoint_path=None,
+      save_path="body-floating-5.77.pt", epochs=20)
