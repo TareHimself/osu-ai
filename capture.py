@@ -1,37 +1,18 @@
-import pyautogui
+from typing import Union
 from os import path, mkdir, getcwd
 import time
 import keyboard
 import cv2
-import mss
-import numpy
+import numpy as np
 from threading import Thread
 from queue import Queue
+from windows import derive_capture_params, WindowCapture, WindowStream
 
-key_1_state = 0
-key_2_state = 0
+
+# list_window_names()
+ScreenShot = WindowCapture("osu!")
 
 capture_frame = False
-
-
-def on_press_1(e):
-    global key_1_state
-    key_1_state = 1
-
-
-def on_release_1(e):
-    global key_1_state
-    key_1_state = 0
-
-
-def on_press_2(e):
-    global key_2_state
-    key_2_state = 1
-
-
-def on_release_2(e):
-    global key_2_state
-    key_2_state = 0
 
 
 def toggle_capture():
@@ -39,68 +20,71 @@ def toggle_capture():
     capture_frame = not capture_frame
 
 
-keyboard.on_press_key(key='z', callback=on_press_1)
-keyboard.on_press_key(key='x', callback=on_press_2)
-keyboard.on_release_key(key='z', callback=on_release_1)
-keyboard.on_release_key(key='x', callback=on_release_2)
-
-keyboard.add_hotkey('ctrl+shift+t', callback=toggle_capture)
+keyboard.add_hotkey('shift+r', callback=toggle_capture)
 
 buffer = Queue()
-SCALE_FACTOR = 0.25
-FINAL_SIZE = (int(1920 * SCALE_FACTOR), int(1080 * SCALE_FACTOR))
+
+FINAL_RESIZE_PERCENT = 0.3
+
+CAPTURE_PARAMS = derive_capture_params()
+RESIZED_PARAMS = derive_capture_params()
+KEYS_CAPTURE_PARAMS = [46 + 46, 75, 1761, 960]
+
+# WindowStream('osu!', *CAPTURE_PARAMS)
+print(CAPTURE_PARAMS)
 
 project_name = input(
     'What Would You Like To Name This Project ?:').lower().strip()
 
 PROJECT_PATH = path.join(getcwd(), 'data', 'raw', project_name)
 
-mkdir(PROJECT_PATH)
+try:
+    mkdir(PROJECT_PATH)
+except:
+    pass
 
 count = 0
 
 
-def SaveFrames():
+def process_frames():
     global count
+    global last_left
+    global last_right
+    global clicks
     stop_saving = False
 
     while not stop_saving:
-        data = buffer.get(block=True)
-        if data is None:
+        frame: Union[np.ndarray, None] = buffer.get(block=True)
+        if frame is None:
             stop_saving = True
             continue
 
-        frame, x, y, k1, k2 = data
-        img = cv2.resize(numpy.array(
-            frame), FINAL_SIZE, interpolation=cv2.INTER_LINEAR)
-
         cv2.imwrite(path.join(
-            PROJECT_PATH, '{}_{}_{}_{}_{}_{}.png'.format(project_name, count, x, y, k1, k2)), img)
+            PROJECT_PATH, f'{count}.png'), frame)
         count += 1
+        print(
+            f'Processed {count} frames :: {buffer.qsize()} Remaining', end='\r')
 
 
-saver = Thread(group=None, target=SaveFrames)
-saver.start()
+save_thread = Thread(group=None, target=process_frames)
+save_thread.start()
 
 try:
-    with mss.mss() as sct:
-        while True:
-            if capture_frame:
-                frame = sct.grab(sct.monitors[1])
-                if frame is not None:
-                    mouseX, mouseY = pyautogui.position()
-                    if mouseX >= 0 and mouseY >= 0:
-                        buffer.put([frame, int(
-                            mouseX * SCALE_FACTOR), int(mouseY * SCALE_FACTOR), key_1_state, key_2_state])
-                    print('Saved {} frames'.format(count), end='\r')
-            time.sleep(0.005)
+    while True:
+        start = time.time()
+        if capture_frame:
+            frame = ScreenShot.capture()
+            if frame is not None:
+                buffer.put(frame)
+
+        elapsed = time.time() - start
+        wait_time = 0.01 - elapsed
+        if wait_time > 0:
+            time.sleep(wait_time)
+
 
 except KeyboardInterrupt as e:
+
     buffer.put(None)
-    saver.join()
+    save_thread.join()
     pass
-
-
-# image.fromarray().convert('L').show()
-# pyscreeze.screenshot('test.png')
-# pyautogui.displayMousePosition()
