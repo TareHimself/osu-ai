@@ -1,4 +1,4 @@
-from os import path, mkdir, getcwd
+from os import listdir, path, mkdir, getcwd
 from queue import Queue
 import keyboard
 from windows import WindowCapture, derive_capture_params, WindowStream
@@ -51,8 +51,16 @@ FINAL_RESIZE_PERCENT = 0.3
 CAPTURE_PARAMS = derive_capture_params()
 RESIZED_PARAMS = derive_capture_params()
 
+
+models = listdir(path.normpath(path.join(
+    getcwd(), 'models')))
+
+models_list = ""
+for i in range(len(models)):
+    models_list += f"\n     [{i}] - {models[i]}"
+
 model_path = path.normpath(path.join(
-    getcwd(), 'models', f'{input("What model would you like to play ? ").strip().lower()}.pt'))
+    getcwd(), 'models', models[int(input("What model would you like to play :" + models_list + '\n').strip())]))
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = ClicksNet().to(device)

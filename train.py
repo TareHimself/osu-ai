@@ -1,5 +1,5 @@
 import time
-from os import path
+from os import getcwd, path
 import cv2
 import numpy as np
 import torch
@@ -16,10 +16,15 @@ transform = transforms.ToTensor()
 device = torch.device(
     'cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
+SAVE_PATH = path.normpath(path.join(getcwd(), 'models'))
 
-def Train(project_name: str, force_rebuild=False, checkpoint_path=None, save_path="model.ptf", batch_size=4, epochs=1, learning_rate=0.0001):
 
-    train_set = OsuDataset(project_name=project_name)  # , force_rebuild=True)
+def Train(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4, epochs=1, learning_rate=0.0001, project_name=""):
+
+    if len(project_name.strip()) == 0:
+        project_name = dataset
+
+    train_set = OsuDataset(project_name=dataset, frame_latency=3)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -38,9 +43,10 @@ def Train(project_name: str, force_rebuild=False, checkpoint_path=None, save_pat
 
     model = ClicksNet().to(device)
 
-    if checkpoint_path:
+    if checkpoint_model:
         try:
-            data = torch.load(checkpoint_path)
+            data = torch.load(path.normpath(
+                path.join(save_path, f"{checkpoint_model}.pt")))
             model.load_state_dict(data['model'])
         except:
             pass
@@ -67,7 +73,7 @@ def Train(project_name: str, force_rebuild=False, checkpoint_path=None, save_pat
             total_accu += (outputs.argmax(1) == results).sum().item()
             total_count += results.size(0)
             loading_bar.set_description_str(
-                f'Training {project_name} :: epoch {epoch + 1}/{epochs} ::  Accuracy {((total_accu / total_count) * 100):.4f} :: loss {loss.item():.4f} :')
+                f'Training {project_name} | Dataset {dataset} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {loss.item():.4f} | ')
             loading_bar.update()
         loading_bar.close()
 
@@ -75,7 +81,7 @@ def Train(project_name: str, force_rebuild=False, checkpoint_path=None, save_pat
         'state': model.state_dict()
     }
 
-    torch.save(data, save_path)
+    torch.save(data, path.normpath(path.join(save_path, f"{project_name}.pt")))
 
 
 def test(model_path=None, image=""):
@@ -103,5 +109,4 @@ def test(model_path=None, image=""):
     return prob.item(), predicated.item(), end - start
 
 
-Train('body-floating-5.77', checkpoint_path=None,
-      save_path="body-floating-5.77.pt", epochs=20)
+Train('violet', checkpoint_model=None, epochs=30)

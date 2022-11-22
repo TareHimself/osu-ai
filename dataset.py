@@ -108,13 +108,14 @@ def extract_data_from_image(image_path):
 
 class OsuDataset(torch.utils.data.Dataset):
 
-    def __init__(self, project_name: str, use_clicks=True, force_rebuild=False) -> None:
+    def __init__(self, project_name: str, frame_latency=3, force_rebuild=False) -> None:
         self.project_path = path.normpath(
             path.join(getcwd(), 'data', 'raw', project_name))
         self.processed_data_path = path.normpath(path.join(
             getcwd(), 'data', 'processed', f"{project_name}.npy"))
         self.images = []
         self.results = []
+        self.frame_latency = frame_latency
 
         if not force_rebuild and path.exists(self.processed_data_path):
             images, results = np.load(
@@ -122,9 +123,15 @@ class OsuDataset(torch.utils.data.Dataset):
 
             self.images = images
             self.results = results
-
         else:
             self.make_training_data()
+
+        self.apply_frame_latency()
+
+    def apply_frame_latency(self):
+        for i in range(self.frame_latency):
+            self.results.pop(0)
+            self.images.pop()
 
     def make_training_data(self):
         global delta_storage
@@ -157,46 +164,6 @@ class OsuDataset(torch.utils.data.Dataset):
 
             except Exception as e:
                 print('ERROR WHILE LOADING', img_path, e)
-
-        # frame offset to account for replay/auto keyoverlay delay, should convert to parameter later
-        frame_latency = 3
-        for i in range(frame_latency):
-            self.results.pop(0)
-            self.images.pop()
-
-        # old balancing code
-        # classes_count = {}
-
-        # for img_path in tqdm(images):
-        #     try:
-
-        #         result = extract_data_from_image(
-        #             path.normpath(path.join(self.project_path, img_path)))
-
-        #         if result is None:
-        #             continue
-
-        #         image, action = result
-
-        #         if action not in classes_count.keys():
-        #             classes_count[action] = []
-        #         classes_count[action].append(image)
-
-        #     except Exception as e:
-        #         print('ERROR WHILE LOADING', img_path, e)
-
-        # largest = max(list(map(lambda x: len(x), classes_count.values())))
-
-        # for label, data in classes_count.items():
-        #     total = len(data)
-        #     if total < largest:
-        #         for i in tqdm(range(largest - total), f'Balancing Class {label}'):
-        #             classes_count[label].append(data[i % total])
-
-        # for label, data in classes_count.items():
-        #     for image in data:
-        #         self.results.append(label)
-        #         self.images.append(trans(image).numpy())
 
         np.save(self.processed_data_path, [self.images, self.results])
 
