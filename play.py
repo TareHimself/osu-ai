@@ -89,7 +89,11 @@ print("Model Loaded, 'Shitf + R' To Toggle the model")
 
 
 # Thread(daemon=True, group=None, target=handle_video).start()
-
+STATE_DISPLAY = {
+    0: "Idle    ",
+    1: "Button 1",
+    2: "Button 2"
+}
 try:
     while True:
         start = time.time()
@@ -109,7 +113,7 @@ try:
             probs = torch.softmax(output, dim=1)
             prob = probs[0][predicated.item()]
             print(
-                f"Decision {predicated.item()} :: chance {prob.item()}", end='\r')
+                f"Decision {STATE_DISPLAY[predicated.item()]} :: chance {prob.item():.2f}", end='\r')
             if prob.item() > 0:  # 0.7:
                 set_key_state(predicated.item())
 
