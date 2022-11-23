@@ -19,8 +19,9 @@ PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 SAVE_PATH = path.normpath(path.join(getcwd(), 'models'))
 
 
-def train_loop(model, data_loader, learning_rate, criterion, project_name, dataset_name, total_epochs):
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+def train_loop(model, data_loader, learning_rate, criterion, project_name, dataset_name, total_epochs, label_type: torch.Type =torch.LongTensor, get_accuracy = lambda predicted, actual: (predicted.argmax(1) == actual).sum().item()):
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=learning_rate)
 
     for epoch in range(total_epochs):
         loading_bar = tqdm(total=len(data_loader))
@@ -28,7 +29,7 @@ def train_loop(model, data_loader, learning_rate, criterion, project_name, datas
         for idx, data in enumerate(data_loader):
             images, results = data
             images = images.to(PYTORCH_DEVICE)
-            results = results.type(torch.LongTensor).to(PYTORCH_DEVICE)
+            results = results.type(label_type).to(PYTORCH_DEVICE)
 
             optimizer.zero_grad()
 
@@ -38,7 +39,7 @@ def train_loop(model, data_loader, learning_rate, criterion, project_name, datas
 
             loss.backward()
             optimizer.step()
-            total_accu += (outputs.argmax(1) == results).sum().item()
+            total_accu += get_accuracy(outputs,results)
             total_count += results.size(0)
             loading_bar.set_description_str(
                 f'Training {project_name} | Dataset {dataset_name} | epoch {epoch + 1}/{total_epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {loss.item():.4f} | ')
@@ -55,8 +56,6 @@ def train_clicks_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
                            frame_latency=3)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-
 
     # print(np.transpose(train_set[0][0],(3,270,280)).shape)
 
@@ -118,7 +117,7 @@ def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, sa
     criterion = nn.MSELoss()
 
     train_loop(model, osu_data_loader, learning_rate,
-               criterion, project_name, dataset, epochs)
+               criterion, project_name, dataset, epochs, label_type=torch.FloatTensor,get_accuracy= lambda predicted, actual : (predicted.round() == actual).sum().item())
 
     data = {
         'state': model.state_dict()
