@@ -52,12 +52,11 @@ def train_clicks_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
         project_name = dataset
 
     train_set = OsuDataset(project_name=dataset,
-                           frame_latency=0, train_actions=False)
+                           frame_latency=3)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    image = train_set[0][1]
-    print(image.shape, image)
+
 
     # print(np.transpose(train_set[0][0],(3,270,280)).shape)
 
@@ -104,7 +103,7 @@ def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, sa
         shuffle=True
     )
 
-    print(train_set[0][0].shape, train_set[1000:1050][1])
+    print(train_set[1000:1050][1])
 
     model = MouseNet().to(PYTORCH_DEVICE)
 
@@ -129,4 +128,4 @@ def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, sa
         path.join(save_path, f"mouse_{project_name}.pt")))
 
 
-train_clicks_net('in-my-heart-5.86', checkpoint_model=None, epochs=30)
+train_mouse_net('in-my-heart-5.86', checkpoint_model=None, epochs=30)

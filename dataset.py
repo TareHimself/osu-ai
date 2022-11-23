@@ -139,8 +139,8 @@ class OsuDataset(torch.utils.data.Dataset):
             image_data, cursor_data, action_data = np.load(
                 self.processed_data_path, allow_pickle=True)
 
-            self.images = image_data
-            self.labels = action_data if self.is_actions else cursor_data
+            self.images = list(image_data)
+            self.labels = list(action_data if self.is_actions else cursor_data)
         else:
             self.make_training_data()
 
