@@ -67,7 +67,8 @@ def get_press_state(unique_id, button):
 
 
 def get_cursor_position(play_field: np.array):
-    result = cv2.matchTemplate(play_field, GAME_CURSOR, cv2.TM_SQDIFF, None, GAME_CURSOR)
+    result = cv2.matchTemplate(
+        play_field, GAME_CURSOR, cv2.TM_SQDIFF, None, GAME_CURSOR)
 
     cv2.normalize(result, result, 0, 1, cv2.NORM_MINMAX, -1)
 
@@ -82,7 +83,7 @@ def extract_data_from_image(image_path):
     osu_screenshot = cv2.imread(image_path, cv2.IMREAD_COLOR)
 
     osu_buttons = osu_screenshot[960:960 +
-                                     BUTTON_CAPTURE_HEIGHT, 1760:1760 + (BUTTON_CAPTURE_WIDTH * 2)].copy()
+                                 BUTTON_CAPTURE_HEIGHT, 1760:1760 + (BUTTON_CAPTURE_WIDTH * 2)].copy()
 
     half_b_h = int((BUTTON_CAPTURE_HEIGHT / 2))
     half_b_w = int((BUTTON_CAPTURE_WIDTH / 2))
@@ -90,14 +91,14 @@ def extract_data_from_image(image_path):
     capture_area_l = 10
 
     osu_left_button = osu_buttons[half_b_h - capture_area_l:half_b_h +
-                                                            capture_area_l,
-                      half_b_w - capture_area_l:half_b_w + capture_area_l]
+                                  capture_area_l,
+                                  half_b_w - capture_area_l:half_b_w + capture_area_l]
     osu_right_button = osu_buttons[half_b_h - capture_area_l:half_b_h + capture_area_l, half_b_w +
-                                                                                        BUTTON_CAPTURE_WIDTH - capture_area_l:half_b_w + BUTTON_CAPTURE_WIDTH + capture_area_l]
+                                   BUTTON_CAPTURE_WIDTH - capture_area_l:half_b_w + BUTTON_CAPTURE_WIDTH + capture_area_l]
 
     osu_play_area = osu_screenshot[
-                    PLAY_AREA_CAPTURE_PARAMS[3]:PLAY_AREA_CAPTURE_PARAMS[3] + PLAY_AREA_CAPTURE_PARAMS[1],
-                    PLAY_AREA_CAPTURE_PARAMS[2]:PLAY_AREA_CAPTURE_PARAMS[2] + PLAY_AREA_CAPTURE_PARAMS[0]].copy()
+        PLAY_AREA_CAPTURE_PARAMS[3]:PLAY_AREA_CAPTURE_PARAMS[3] + PLAY_AREA_CAPTURE_PARAMS[1],
+        PLAY_AREA_CAPTURE_PARAMS[2]:PLAY_AREA_CAPTURE_PARAMS[2] + PLAY_AREA_CAPTURE_PARAMS[0]].copy()
 
     left_press_state, right_press_state = int(get_press_state('left',
                                                               osu_left_button)), int(
@@ -186,7 +187,8 @@ class OsuDataset(torch.utils.data.Dataset):
             except Exception as e:
                 print('ERROR WHILE LOADING', img_path, e)
 
-        np.save(self.processed_data_path, [image_data, cursor_data, action_data])
+        np.save(self.processed_data_path, [
+                image_data, cursor_data, action_data])
         self.images = image_data
         self.labels = action_data if self.is_actions else cursor_data
 

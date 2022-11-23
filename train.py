@@ -51,12 +51,13 @@ def train_clicks_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
     if len(project_name.strip()) == 0:
         project_name = dataset
 
-    train_set = OsuDataset(project_name=dataset, frame_latency=3)
+    train_set = OsuDataset(project_name=dataset,
+                           frame_latency=0, train_actions=False)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # image = train_set[0][0]
-    # print(image.shape,image)
+    image = train_set[0][1]
+    print(image.shape, image)
 
     # print(np.transpose(train_set[0][0],(3,270,280)).shape)
 
@@ -78,13 +79,15 @@ def train_clicks_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
 
     criterion = nn.CrossEntropyLoss()
 
-    train_loop(model, osu_data_loader, learning_rate, criterion, project_name, dataset, epochs)
+    train_loop(model, osu_data_loader, learning_rate,
+               criterion, project_name, dataset, epochs)
 
     data = {
         'state': model.state_dict()
     }
 
-    torch.save(data, path.normpath(path.join(save_path, f"clicks_{project_name}.pt")))
+    torch.save(data, path.normpath(
+        path.join(save_path, f"clicks_{project_name}.pt")))
 
 
 def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
@@ -92,7 +95,8 @@ def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, sa
     if len(project_name.strip()) == 0:
         project_name = dataset
 
-    train_set = OsuDataset(project_name=dataset, frame_latency=0, train_actions=False)
+    train_set = OsuDataset(project_name=dataset,
+                           frame_latency=0, train_actions=False)
 
     osu_data_loader = DataLoader(
         train_set,
@@ -114,13 +118,15 @@ def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, sa
 
     criterion = nn.MSELoss()
 
-    train_loop(model, osu_data_loader, learning_rate, criterion, project_name, dataset, epochs)
+    train_loop(model, osu_data_loader, learning_rate,
+               criterion, project_name, dataset, epochs)
 
     data = {
         'state': model.state_dict()
     }
 
-    torch.save(data, path.normpath(path.join(save_path, f"mouse_{project_name}.pt")))
+    torch.save(data, path.normpath(
+        path.join(save_path, f"mouse_{project_name}.pt")))
 
 
-train_clicks_net('north-4.86-hd', checkpoint_model=None, epochs=30)
+train_clicks_net('in-my-heart-5.86', checkpoint_model=None, epochs=30)
