@@ -9,5 +9,7 @@
 
 - The skin the model currently uses is [here](/Oka_Custom.osk).
 
-## Example play below using the [Violet](/models/violet.pt) Model on [this map](https://osu.ppy.sh/beatmapsets/765778#osu/1627148).  The [Violet](models/violet.pt) model was trained using [this map](https://osu.ppy.sh/beatmapsets/1721048#osu/3560542).
+- Showcase video [here](https://www.youtube.com/watch?v=ZgHyN98iR1M&t=5s).
+
+## Example play below on [this map](https://osu.ppy.sh/beatmapsets/765778#osu/1627148).  The model was trained using [this map](https://osu.ppy.sh/beatmapsets/1721048#osu/3560542).
 ![goodplay](good-play.png)
