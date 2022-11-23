@@ -109,4 +109,4 @@ def test(model_path=None, image=""):
     return prob.item(), predicated.item(), end - start
 
 
-Train('violet', checkpoint_model=None, epochs=30)
+Train('north-4.86-hd', checkpoint_model=None, epochs=30)
