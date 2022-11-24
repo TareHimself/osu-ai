@@ -19,7 +19,7 @@ PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 SAVE_PATH = path.normpath(path.join(getcwd(), 'models'))
 
 
-def train_loop(model, data_loader, learning_rate, criterion, project_name, dataset_name, total_epochs, label_type: torch.Type =torch.LongTensor, get_accuracy = lambda predicted, actual: (predicted.argmax(1) == actual).sum().item()):
+def train_loop(model, data_loader, learning_rate, criterion, project_name, dataset_name, total_epochs, label_type: torch.Type = torch.LongTensor, get_accuracy=lambda predicted, actual: (predicted.argmax(1) == actual).sum().item()):
     optimizer = torch.optim.Adam(
         model.parameters(), lr=learning_rate)
 
@@ -39,7 +39,7 @@ def train_loop(model, data_loader, learning_rate, criterion, project_name, datas
 
             loss.backward()
             optimizer.step()
-            total_accu += get_accuracy(outputs,results)
+            total_accu += get_accuracy(outputs, results)
             total_count += results.size(0)
             loading_bar.set_description_str(
                 f'Training {project_name} | Dataset {dataset_name} | epoch {epoch + 1}/{total_epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {loss.item():.4f} | ')
@@ -90,6 +90,7 @@ def train_clicks_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
 
 def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
                     epochs=1, learning_rate=0.0001, project_name=""):
+
     if len(project_name.strip()) == 0:
         project_name = dataset
 
@@ -102,7 +103,8 @@ def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, sa
         shuffle=True
     )
 
-    print(train_set[1000:1050][1])
+    print(train_set[0][0])
+    # print(train_set[1000:1050][1])
 
     model = MouseNet().to(PYTORCH_DEVICE)
 
@@ -117,7 +119,7 @@ def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, sa
     criterion = nn.MSELoss()
 
     train_loop(model, osu_data_loader, learning_rate,
-               criterion, project_name, dataset, epochs, label_type=torch.FloatTensor,get_accuracy= lambda predicted, actual : (predicted.round() == actual).sum().item())
+               criterion, project_name, dataset, epochs, label_type=torch.FloatTensor, get_accuracy=lambda predicted, actual: (predicted.round() == actual).sum().item())
 
     data = {
         'state': model.state_dict()
@@ -127,4 +129,5 @@ def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, sa
         path.join(save_path, f"mouse_{project_name}.pt")))
 
 
-train_mouse_net('in-my-heart-5.86', checkpoint_model=None, epochs=30)
+train_mouse_net('in-my-heart-5.86', checkpoint_model=None,
+                epochs=30, batch_size=8)
