@@ -120,7 +120,7 @@ def extract_data_from_image(image_path):
         delta_storage = {}
         return None
 
-    return [osu_play_area, key_state, get_cursor_position(osu_play_area)]
+    return [osu_play_area/255, key_state, get_cursor_position(osu_play_area) / np.array([len(osu_play_area[0]),len(osu_play_area[1])])]
 
 
 class OsuDataset(torch.utils.data.Dataset):
