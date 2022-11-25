@@ -11,6 +11,7 @@ from dataset import OsuDataset
 import torchvision.transforms as transforms
 from models import ClicksNet, MouseNet
 from torch.utils.data import DataLoader
+from functorch import vmap
 
 transform = transforms.ToTensor()
 
@@ -28,13 +29,11 @@ def train_loop(model, data_loader, learning_rate, criterion, project_name, datas
         total_accu, total_count = 0, 0
         for idx, data in enumerate(data_loader):
             images, results = data
-            images = images.to(PYTORCH_DEVICE)
+            images = images.type(torch.FloatTensor).to(PYTORCH_DEVICE)
             results = results.type(label_type).to(PYTORCH_DEVICE)
 
             optimizer.zero_grad()
-
             outputs = model(images)
-
             loss = criterion(outputs, results)
 
             loss.backward()
@@ -47,7 +46,7 @@ def train_loop(model, data_loader, learning_rate, criterion, project_name, datas
         loading_bar.close()
 
 
-def train_clicks_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
+def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
                      epochs=1, learning_rate=0.0001, project_name=""):
     if len(project_name.strip()) == 0:
         project_name = dataset
@@ -85,26 +84,23 @@ def train_clicks_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
     }
 
     torch.save(data, path.normpath(
-        path.join(save_path, f"clicks_{project_name}.pt")))
+        path.join(save_path, f"model_action_{project_name}.pt")))
 
 
-def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
-                    epochs=1, learning_rate=0.0001, project_name=""):
+def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
+                  epochs=1, learning_rate=0.0001, project_name=""):
 
     if len(project_name.strip()) == 0:
         project_name = dataset
 
     train_set = OsuDataset(project_name=dataset,
-                           frame_latency=0, train_actions=False)
+                           frame_latency=-4, train_actions=False)
 
     osu_data_loader = DataLoader(
         train_set,
         batch_size=batch_size,
         shuffle=True
     )
-
-    print(train_set[0][0])
-    # print(train_set[1000:1050][1])
 
     model = MouseNet().to(PYTORCH_DEVICE)
 
@@ -118,16 +114,17 @@ def train_mouse_net(dataset: str, force_rebuild=False, checkpoint_model=None, sa
 
     criterion = nn.MSELoss()
 
+    # accuracy is calculated with a 5 pixel error
     train_loop(model, osu_data_loader, learning_rate,
-               criterion, project_name, dataset, epochs, label_type=torch.FloatTensor, get_accuracy=lambda predicted, actual: (predicted.round() == actual).sum().item())
+               criterion, project_name, dataset, epochs, label_type=torch.FloatTensor, get_accuracy=lambda predicted, actual: ((predicted - actual)**2).mean())
 
     data = {
         'state': model.state_dict()
     }
 
     torch.save(data, path.normpath(
-        path.join(save_path, f"mouse_{project_name}.pt")))
+        path.join(save_path, f"model_aim_{project_name}.pt")))
 
 
-train_mouse_net('in-my-heart-5.86', checkpoint_model=None,
-                epochs=30, batch_size=8)
+train_aim_net('meaning-of-love-4.62', checkpoint_model=None,
+              epochs=10)

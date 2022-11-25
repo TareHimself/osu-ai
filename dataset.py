@@ -20,7 +20,7 @@ BUTTON_CLICKED_COLOR = np.array([254, 254, 220])
 BUTTON_CAPTURE_HEIGHT = 75
 BUTTON_CAPTURE_WIDTH = 46
 PLAY_AREA_CAPTURE_PARAMS = derive_capture_params()
-FINAL_RESIZE_PERCENT = 0.3
+FINAL_RESIZE_PERCENT = 0.2
 GAME_CURSOR = cv2.imread('cursor.png', cv2.IMREAD_COLOR)
 
 
@@ -68,7 +68,7 @@ def get_press_state(unique_id, button):
 
 def get_cursor_position(play_field: np.array):
     result = cv2.matchTemplate(
-        play_field, GAME_CURSOR, cv2.TM_SQDIFF, None, GAME_CURSOR)
+        play_field, GAME_CURSOR, cv2.TM_SQDIFF)  # , None, GAME_CURSOR)
 
     cv2.normalize(result, result, 0, 1, cv2.NORM_MINMAX, -1)
 
@@ -104,23 +104,21 @@ def extract_data_from_image(image_path):
                                                               osu_left_button)), int(
         get_press_state('right', osu_right_button))
 
-    osu_play_area = cv2.resize(osu_play_area, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+    resized_play_area = cv2.resize(osu_play_area, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
         PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
 
     key_state = KEY_STATES.get(
         f"{left_press_state}{right_press_state}", "invalid")
 
-    # print(get_button_cell_color(osu_left_button),
-    #       get_button_cell_color(osu_right_button), f"{left_press_state}{right_press_state}", delta_storage_snapshot, delta_storage)
     # cv2.imshow(
-    #     f"debug", osu_screenshot)
+    #     f"debug", resized_play_area)
     # cv2.waitKey(1)
 
     if key_state == 'invalid':
         delta_storage = {}
         return None
 
-    return [osu_play_area/255, key_state, get_cursor_position(osu_play_area) / np.array([len(osu_play_area[0]),len(osu_play_area[1])])]
+    return [resized_play_area/255, key_state, get_cursor_position(osu_play_area) / np.array([PLAY_AREA_CAPTURE_PARAMS[0], PLAY_AREA_CAPTURE_PARAMS[1]])]
 
 
 class OsuDataset(torch.utils.data.Dataset):
@@ -147,9 +145,13 @@ class OsuDataset(torch.utils.data.Dataset):
         self.apply_frame_latency()
 
     def apply_frame_latency(self):
-        for i in range(self.frame_latency):
-            self.labels.pop(0)
-            self.images.pop()
+        for i in range(abs(self.frame_latency)):
+            if(self.frame_latency > 0):
+                self.labels.pop(0)
+                self.images.pop()
+            else:
+                self.labels.pop()
+                self.images.pop(0)
 
     def make_training_data(self):
         global delta_storage
@@ -175,9 +177,9 @@ class OsuDataset(torch.utils.data.Dataset):
                 if result is None:
                     continue
 
-                image, action, cursor = result
+                image, key_state, cursor = result
 
-                action_data.append(action)
+                action_data.append(key_state)
                 cursor_data.append(cursor)
                 image_data.append(trans(image).numpy())
 

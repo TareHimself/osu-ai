@@ -12,7 +12,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from threading import Thread
 import torchvision.transforms as transforms
-from models import ClicksNet
+from models import ClicksNet, MouseNet
+import win32api
 transform = transforms.ToTensor()
 
 cap = WindowCapture("osu!")
@@ -46,7 +47,7 @@ def set_key_state(state: int):
     last_state = state
 
 
-FINAL_RESIZE_PERCENT = 0.3
+FINAL_RESIZE_PERCENT = 0.2
 
 CAPTURE_PARAMS = derive_capture_params()
 RESIZED_PARAMS = derive_capture_params()
@@ -59,11 +60,15 @@ models_list = ""
 for i in range(len(models)):
     models_list += f"\n     [{i}] - {models[i]}"
 
+user_choice: str = models[int(
+    input("What model would you like to play :" + models_list + '\n').strip())]
 model_path = path.normpath(path.join(
-    getcwd(), 'models', models[int(input("What model would you like to play :" + models_list + '\n').strip())]))
+    getcwd(), 'models', user_choice))
 
+IS_AIM = user_choice.startswith(
+    'model_aim')
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = ClicksNet().to(device)
+model = MouseNet().to(device) if IS_AIM else ClicksNet().to(device)
 model.load_state_dict(torch.load(
     model_path
 )['state'])
@@ -104,18 +109,27 @@ try:
                     CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
 
             elapsed = time.time() - start
-            inputs = transform(np.array(cv_img)).reshape(
-                (1, 3, 300, 399)).to(device)
+            converted_frame = transform(np.array(cv_img) / 255)
+            inputs = converted_frame.reshape(
+                (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2])).type(torch.FloatTensor).to(device)
+
             output = model(inputs)
 
-            _, predicated = torch.max(output, dim=1)
+            if IS_AIM:
+                mouse_x_percent, mouse_y_percent = output[0]
+                position = (int(
+                    mouse_x_percent * CAPTURE_PARAMS[0]), int(mouse_y_percent * CAPTURE_PARAMS[3]))
+                # win32api.SetCursorPos(position)
+                print(output[0], end='\r')
+            else:
+                _, predicated = torch.max(output, dim=1)
 
-            probs = torch.softmax(output, dim=1)
-            prob = probs[0][predicated.item()]
-            print(
-                f"Decision {STATE_DISPLAY[predicated.item()]} :: chance {prob.item():.2f}", end='\r')
-            if prob.item() > 0:  # 0.7:
-                set_key_state(predicated.item())
+                probs = torch.softmax(output, dim=1)
+                prob = probs[0][predicated.item()]
+                print(
+                    f"Decision {STATE_DISPLAY[predicated.item()]} :: chance {prob.item():.2f}", end='\r')
+                if prob.item() > 0:  # 0.7:
+                    set_key_state(predicated.item())
 
             # IMAGE_BUFF.put(cv_img)
             # elapsed = time.time() - start
