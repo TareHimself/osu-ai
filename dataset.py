@@ -126,6 +126,7 @@ def extract_data_from_image(image_path):
 class OsuDataset(torch.utils.data.Dataset):
 
     def __init__(self, project_name: str, frame_latency=3, train_actions=True, force_rebuild=False) -> None:
+        self.project = project_name
         self.project_path = path.normpath(
             path.join(getcwd(), 'data', 'raw', project_name))
         self.processed_data_path = path.normpath(path.join(
@@ -158,8 +159,6 @@ class OsuDataset(torch.utils.data.Dataset):
     def make_training_data(self):
         global delta_storage
 
-        print('Generating data')
-
         delta_storage = {}
 
         images = listdir(self.project_path)
@@ -170,7 +169,7 @@ class OsuDataset(torch.utils.data.Dataset):
         image_data = []
         cursor_data = []
         action_data = []
-        for img_path in tqdm(images):
+        for img_path in tqdm(images, f"Processing Dataset {self.project} :"):
             try:
 
                 result = extract_data_from_image(

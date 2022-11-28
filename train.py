@@ -10,7 +10,7 @@ import torch.optim as optim
 from tqdm import tqdm
 from dataset import OsuDataset
 import torchvision.transforms as transforms
-from models import ClicksNet, MouseNet
+from models import ActionsNet, AimNet
 from torch.utils.data import DataLoader
 
 
@@ -36,9 +36,9 @@ def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
         shuffle=True
     )
 
-    print(train_set[0][0].shape, train_set[1000:1050][1])
+    # print(train_set[0][0].shape, train_set[1000:1050][1])
 
-    model = ClicksNet().to(device)
+    model = ActionsNet().to(device)
 
     if checkpoint_model:
         try:
@@ -72,10 +72,10 @@ def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
             total_count += results.size(0)
             running_loss += loss.item() * images.size(0)
             loading_bar.set_description_str(
-                f'Training {project_name} | Dataset {dataset} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {loss.item():.4f} | ')
+                f'Training Actions {project_name} | Dataset {dataset} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {loss.item():.4f} | ')
             loading_bar.update()
         loading_bar.set_description_str(
-            f'Training {project_name} | Dataset {dataset} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.4f} | ')
+            f'Training Actions {project_name} | Dataset {dataset} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.4f} | ')
         loading_bar.close()
 
     data = {
@@ -93,7 +93,7 @@ def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save
         project_name = dataset
 
     train_set = OsuDataset(project_name=dataset,
-                           frame_latency=2, train_actions=False)
+                           frame_latency=0, train_actions=False)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -105,7 +105,7 @@ def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save
 
     # print(train_set[0][0].shape, train_set[1000:1050][1])
 
-    model = MouseNet().to(device)
+    model = AimNet().to(device)
 
     if checkpoint_model:
         try:
@@ -139,10 +139,10 @@ def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save
             # total_count += results.size(0)
             running_loss += loss.item() * images.size(0)
             loading_bar.set_description_str(
-                f'Training {project_name} | Dataset {dataset} | epoch {epoch + 1}/{epochs} | loss {loss.item():.10f} | ')
+                f'Training Aim {project_name} | Dataset {dataset} | epoch {epoch + 1}/{epochs} | loss {loss.item():.10f} | ')
             loading_bar.update()
         loading_bar.set_description_str(
-            f'Training {project_name} | Dataset {dataset} | epoch {epoch + 1}/{epochs} | loss {(running_loss / len(osu_data_loader.dataset)):.10f} | ')
+            f'Training Aim {project_name} | Dataset {dataset} | epoch {epoch + 1}/{epochs} | loss {(running_loss / len(osu_data_loader.dataset)):.10f} | ')
         loading_bar.close()
 
     data = {
@@ -153,5 +153,8 @@ def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save
         path.join(save_path, f"model_aim_{project_name}.pt")))
 
 
-train_aim_net('zen-zen-zense-5.35', checkpoint_model=None,
-              epochs=200)
+train_aim_net('leia-2-5.41', checkpoint_model=None,
+              epochs=20)
+
+# train_action_net('leia-2-5.41', checkpoint_model=None,
+#                  epochs=20)

@@ -12,7 +12,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from threading import Thread
 import torchvision.transforms as transforms
-from models import ClicksNet, MouseNet
+from models import ActionsNet, AimNet
 from constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS
 import win32api
 transform = transforms.ToTensor()
@@ -56,7 +56,7 @@ model_path = path.normpath(path.join(
 IS_AIM = user_choice.startswith(
     'model_aim')
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = MouseNet().to(device) if IS_AIM else ClicksNet().to(device)
+model = AimNet().to(device) if IS_AIM else ActionsNet().to(device)
 model.load_state_dict(torch.load(
     model_path
 )['state'])
