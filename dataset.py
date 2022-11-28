@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 from tqdm import tqdm
-
+from constants import PLAY_AREA_CAPTURE_PARAMS, GAME_CURSOR, BUTTON_CLICKED_COLOR, BUTTON_CAPTURE_WIDTH, BUTTON_CAPTURE_HEIGHT, FINAL_RESIZE_PERCENT, PLAY_AREA_WIDTH_HEIGHT
 from windows import derive_capture_params
 
 trans = transforms.ToTensor()
@@ -15,13 +15,6 @@ KEY_STATES = {
     "01": 1,
     "10": 2,
 }
-
-BUTTON_CLICKED_COLOR = np.array([254, 254, 220])
-BUTTON_CAPTURE_HEIGHT = 75
-BUTTON_CAPTURE_WIDTH = 46
-PLAY_AREA_CAPTURE_PARAMS = derive_capture_params()
-FINAL_RESIZE_PERCENT = 0.2
-GAME_CURSOR = cv2.imread('cursor.png', cv2.IMREAD_COLOR)
 
 
 def get_button_cell_color(img):
@@ -77,13 +70,9 @@ def get_cursor_position(play_field: np.array):
     return min_loc + np.array([int(len(GAME_CURSOR[0]) / 2), int(len(GAME_CURSOR[1]) / 2)])
 
 
-def extract_data_from_image(image_path):
-    global delta_storage
-
-    osu_screenshot = cv2.imread(image_path, cv2.IMREAD_COLOR)
-
-    osu_buttons = osu_screenshot[960:960 +
-                                 BUTTON_CAPTURE_HEIGHT, 1760:1760 + (BUTTON_CAPTURE_WIDTH * 2)].copy()
+def get_buttons_state(image):
+    osu_buttons = image[960:960 +
+                        BUTTON_CAPTURE_HEIGHT, 1760:1760 + (BUTTON_CAPTURE_WIDTH * 2)].copy()
 
     half_b_h = int((BUTTON_CAPTURE_HEIGHT / 2))
     half_b_w = int((BUTTON_CAPTURE_WIDTH / 2))
@@ -96,29 +85,42 @@ def extract_data_from_image(image_path):
     osu_right_button = osu_buttons[half_b_h - capture_area_l:half_b_h + capture_area_l, half_b_w +
                                    BUTTON_CAPTURE_WIDTH - capture_area_l:half_b_w + BUTTON_CAPTURE_WIDTH + capture_area_l]
 
-    osu_play_area = osu_screenshot[
-        PLAY_AREA_CAPTURE_PARAMS[3]:PLAY_AREA_CAPTURE_PARAMS[3] + PLAY_AREA_CAPTURE_PARAMS[1],
-        PLAY_AREA_CAPTURE_PARAMS[2]:PLAY_AREA_CAPTURE_PARAMS[2] + PLAY_AREA_CAPTURE_PARAMS[0]].copy()
-
     left_press_state, right_press_state = int(get_press_state('left',
                                                               osu_left_button)), int(
         get_press_state('right', osu_right_button))
 
+    return KEY_STATES.get(
+        f"{left_press_state}{right_press_state}", "invalid")
+
+
+def extract_data_from_image(image_path):
+    global delta_storage
+
+    osu_screenshot = cv2.imread(image_path, cv2.IMREAD_COLOR)
+
+    key_state = get_buttons_state(osu_screenshot)
+
+    osu_play_area = osu_screenshot[
+        PLAY_AREA_CAPTURE_PARAMS[3]:PLAY_AREA_CAPTURE_PARAMS[3] + PLAY_AREA_CAPTURE_PARAMS[1],
+        PLAY_AREA_CAPTURE_PARAMS[2]:PLAY_AREA_CAPTURE_PARAMS[2] + PLAY_AREA_CAPTURE_PARAMS[0]].copy()
+
     resized_play_area = cv2.resize(osu_play_area, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
         PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
 
-    key_state = KEY_STATES.get(
-        f"{left_press_state}{right_press_state}", "invalid")
+    resized_play_area_grey = cv2.cvtColor(
+        resized_play_area, cv2.COLOR_BGR2GRAY)
 
+    # print("Key State:", key_state)
     # cv2.imshow(
-    #     f"debug", resized_play_area)
-    # cv2.waitKey(1)
+    #     f"debug", resized_play_area_grey)
+    # cv2.waitKey(0)
 
+    # print(PLAY_AREA_WIDTH_HEIGHT)
     if key_state == 'invalid':
         delta_storage = {}
         return None
 
-    return [resized_play_area/255, key_state, get_cursor_position(osu_play_area) / np.array([PLAY_AREA_CAPTURE_PARAMS[0], PLAY_AREA_CAPTURE_PARAMS[1]])]
+    return [np.stack([resized_play_area_grey, resized_play_area_grey, resized_play_area_grey], axis=-1), key_state, get_cursor_position(osu_play_area) / PLAY_AREA_WIDTH_HEIGHT]
 
 
 class OsuDataset(torch.utils.data.Dataset):
@@ -199,3 +201,7 @@ class OsuDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.images)
+
+
+# np.save('test_data.npy', extract_data_from_image(
+#     "D:\Github\osu-ai\data\\raw\meaning-of-love-4.62\\755.png"))

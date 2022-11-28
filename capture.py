@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from threading import Thread
 from queue import Queue
-from windows import derive_capture_params, WindowCapture, WindowStream
+from windows import WindowCapture
 
 
 # list_window_names()
@@ -23,15 +23,6 @@ def toggle_capture():
 keyboard.add_hotkey('shift+r', callback=toggle_capture)
 
 buffer = Queue()
-
-FINAL_RESIZE_PERCENT = 0.3
-
-CAPTURE_PARAMS = derive_capture_params()
-RESIZED_PARAMS = derive_capture_params()
-KEYS_CAPTURE_PARAMS = [46 + 46, 75, 1761, 960]
-
-# WindowStream('osu!', *CAPTURE_PARAMS)
-print(CAPTURE_PARAMS)
 
 project_name = input(
     'What Would You Like To Name This Project ?:').lower().strip()

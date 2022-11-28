@@ -13,21 +13,15 @@ import torch.optim as optim
 from threading import Thread
 import torchvision.transforms as transforms
 from models import ClicksNet, MouseNet
+from constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS
 import win32api
 transform = transforms.ToTensor()
 
 cap = WindowCapture("osu!")
 
 
-capture_frame = False
+do_prediction = False
 
-
-def toggle_capture():
-    global capture_frame
-    capture_frame = not capture_frame
-
-
-keyboard.add_hotkey('shift+r', callback=toggle_capture)
 
 last_state = 0
 
@@ -45,12 +39,6 @@ def set_key_state(state: int):
         keyboard.press('z')
 
     last_state = state
-
-
-FINAL_RESIZE_PERCENT = 0.2
-
-CAPTURE_PARAMS = derive_capture_params()
-RESIZED_PARAMS = derive_capture_params()
 
 
 models = listdir(path.normpath(path.join(
@@ -75,9 +63,19 @@ model.load_state_dict(torch.load(
 model.eval()
 print("Model Loaded, 'Shitf + R' To Toggle the model")
 
-# IMAGE_BUFF = Queue()
+IMAGE_BUFF = Queue()
 
-# elapsed = 1
+elapsed = 1
+
+
+def toggle_capture():
+    global do_prediction
+    do_prediction = not do_prediction
+    if do_prediction:
+        IMAGE_BUFF.queue.clear()
+
+
+keyboard.add_hotkey('shift+r', callback=toggle_capture)
 
 
 # def handle_video():
@@ -99,39 +97,43 @@ STATE_DISPLAY = {
     1: "Button 1",
     2: "Button 2"
 }
+
 try:
     while True:
         start = time.time()
-        frame = cap.capture(*CAPTURE_PARAMS)
-        if frame is not None and capture_frame:
-            cv_img = cv2.resize(
-                frame,  (int(CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
-                    CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
+        frame = cap.capture(*PLAY_AREA_CAPTURE_PARAMS)
+        if frame is not None:
+            cv_img = cv2.cvtColor(cv2.resize(
+                frame,  (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+                    PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR), cv2.COLOR_BGR2GRAY)
 
             elapsed = time.time() - start
-            converted_frame = transform(np.array(cv_img) / 255)
-            inputs = converted_frame.reshape(
-                (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2])).type(torch.FloatTensor).to(device)
+            stacked = np.stack([cv_img, cv_img, cv_img], axis=-1)
+            if do_prediction:
+                converted_frame = transform(stacked)
 
-            output = model(inputs)
+                inputs = converted_frame.reshape(
+                    (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2])).type(torch.FloatTensor).to(device)
 
-            if IS_AIM:
-                mouse_x_percent, mouse_y_percent = output[0]
-                position = (int(
-                    mouse_x_percent * CAPTURE_PARAMS[0]), int(mouse_y_percent * CAPTURE_PARAMS[3]))
-                # win32api.SetCursorPos(position)
-                print(output[0], end='\r')
-            else:
-                _, predicated = torch.max(output, dim=1)
+                output = model(inputs)
 
-                probs = torch.softmax(output, dim=1)
-                prob = probs[0][predicated.item()]
-                print(
-                    f"Decision {STATE_DISPLAY[predicated.item()]} :: chance {prob.item():.2f}", end='\r')
-                if prob.item() > 0:  # 0.7:
-                    set_key_state(predicated.item())
+                if IS_AIM:
+                    mouse_x_percent, mouse_y_percent = output[0]
+                    position = (PLAY_AREA_CAPTURE_PARAMS[2] + int(mouse_x_percent * PLAY_AREA_CAPTURE_PARAMS[0]), PLAY_AREA_CAPTURE_PARAMS[3] + int(
+                        mouse_y_percent * PLAY_AREA_CAPTURE_PARAMS[1]))
+                    win32api.SetCursorPos(position)
+                    print(position, end='\r')
+                else:
+                    _, predicated = torch.max(output, dim=1)
 
-            # IMAGE_BUFF.put(cv_img)
+                    probs = torch.softmax(output, dim=1)
+                    prob = probs[0][predicated.item()]
+                    print(
+                        f"Decision {STATE_DISPLAY[predicated.item()]} :: chance {prob.item():.2f}", end='\r')
+                    if prob.item() > 0:  # 0.7:
+                        set_key_state(predicated.item())
+
+            # IMAGE_BUFF.put(stacked)
             # elapsed = time.time() - start
             # wait_time = 0.01 - elapsed
             # if wait_time > 0:
