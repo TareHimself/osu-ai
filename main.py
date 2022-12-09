@@ -1,17 +1,13 @@
-from capture import start_capture
-from utils import get_validated_input
-from train import train_new, train_checkpoint
-from play import start_play
-USER_MAIN_MENU = """
-What would you like to do ?
-[0] Train a new model
-[1] Finetune a model
-[2] Collect new data
-[3] Test a model
-[4] Quit
+from ai import start_play, start_train, start_capture, get_validated_input
+
+USER_MAIN_MENU = """What would you like to do ?
+    [0] Train
+    [1] Collect data
+    [2] Test
+    [3] Quit
 """
 
-QUIT_CHOICE = 4
+QUIT_CHOICE = 3
 
 
 def get_input():
@@ -23,16 +19,20 @@ def get_input():
 
 
 def run():
-    user_choice = get_validated_input(USER_MAIN_MENU, lambda a: a.strip().isnumeric() and (0 <= int(a.strip()) <= 4), lambda a: int(a.strip()))
+    get_input_params = [USER_MAIN_MENU, lambda a: a.strip().isnumeric() and (
+        0 <= int(a.strip()) <= 3), lambda a: int(a.strip())]
+
+    user_choice = get_validated_input(*get_input_params)
 
     while user_choice != QUIT_CHOICE:
         if user_choice == 0:
-            train_new()
+            start_train()
         elif user_choice == 1:
-            train_checkpoint()
-        elif user_choice == 2:
             start_capture()
-        elif user_choice == 3:
+        elif user_choice == 2:
             start_play()
 
-        user_choice = get_validated_input(USER_MAIN_MENU, lambda a: a.strip().isnumeric(), lambda a: int(a.strip()))
+        user_choice = get_validated_input(*get_input_params)
+
+
+run()

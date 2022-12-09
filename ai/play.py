@@ -1,13 +1,13 @@
 import keyboard
-from windows import WindowCapture
+from ai.windows import WindowCapture
 import time
 import cv2
 import numpy as np
 import torch
-from utils import get_models, get_validated_input, load_model_data
+from ai.utils import get_models, get_validated_input, load_model_data
 import torchvision.transforms as transforms
-from models import ActionsNet, AimNet
-from constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
+from ai.models import ActionsNet, AimNet
+from ai.constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
 import win32api
 
 transform = transforms.ToTensor()
@@ -57,12 +57,11 @@ def start_play(time_between_frames=0):
 
         aim_models = get_models('model_aim_')
 
-        user_choice = get_validated_input(f"""
-        What type of model would you like to test?
-            [0] Actions Model | {len(action_models)} Available
-            [1] Aim Model | {len(action_models)} Available
-            [2] Both Models
-        """, lambda a: a.strip().isnumeric() and (0 <= int(a.strip()) <= 2), lambda a: int(a.strip()))
+        user_choice = get_validated_input(f"""What type of model would you like to test?
+    [0] Actions Model | {len(action_models)} Available
+    [1] Aim Model | {len(aim_models)} Available
+    [2] Both Models
+""", lambda a: a.strip().isnumeric() and (0 <= int(a.strip()) <= 2), lambda a: int(a.strip()))
 
         action_model_index = None
         aim_model_index = None
@@ -73,7 +72,7 @@ def start_play(time_between_frames=0):
                 prompt += f"    [{i}] {action_models[i]}\n"
 
             action_model_index = get_validated_input(prompt, lambda a: a.strip().isnumeric() and (
-                    0 <= int(a.strip()) < len(action_models)), lambda a: int(a.strip()))
+                0 <= int(a.strip()) < len(action_models)), lambda a: int(a.strip()))
 
         if user_choice == 1 or user_choice == 2:
             prompt = "What aim model would you like to use?\n"
@@ -81,19 +80,20 @@ def start_play(time_between_frames=0):
                 prompt += f"    [{i}] {aim_models[i]}\n"
 
             aim_model_index = get_validated_input(prompt, lambda a: a.strip().isnumeric() and (
-                    0 <= int(a.strip()) < len(aim_models)), lambda a: int(a.strip()))
+                0 <= int(a.strip()) < len(aim_models)), lambda a: int(a.strip()))
 
         actions_model = None
         aim_model = None
 
         if action_model_index is not None:
-            actions_model_data = load_model_data(action_models[action_model_index])
+            actions_model_data = load_model_data(
+                action_models[action_model_index])
             actions_model = ActionsNet().to(PYTORCH_DEVICE)
             actions_model.load_state_dict(actions_model_data['state'])
             actions_model.eval()
 
         if aim_model_index is not None:
-            aim_model_data = load_model_data(action_models[aim_model_index])
+            aim_model_data = load_model_data(aim_models[aim_model_index])
             aim_model = AimNet().to(PYTORCH_DEVICE)
             aim_model.load_state_dict(aim_model_data['state'])
             aim_model.eval()
@@ -109,6 +109,8 @@ def start_play(time_between_frames=0):
                             PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR),
                         cv2.COLOR_BGR2GRAY)
 
+                    # cv2.imshow("Debug", cv_img)
+                    # cv2.waitKey(1)
                     stacked = np.stack([cv_img, cv_img, cv_img], axis=-1)
 
                     if do_prediction:
@@ -124,20 +126,22 @@ def start_play(time_between_frames=0):
                             output = aim_model(inputs)
                             mouse_x_percent, mouse_y_percent = output[0]
                             position = (
-                                PLAY_AREA_CAPTURE_PARAMS[2] + int(mouse_x_percent * PLAY_AREA_CAPTURE_PARAMS[0]),
+                                PLAY_AREA_CAPTURE_PARAMS[2] + int(
+                                    mouse_x_percent * PLAY_AREA_CAPTURE_PARAMS[0]),
                                 PLAY_AREA_CAPTURE_PARAMS[3] + int(
                                     mouse_y_percent * PLAY_AREA_CAPTURE_PARAMS[1]))
                             win32api.SetCursorPos(position)
                             debug += f"Cursor Position {position}        "
+
                         if actions_model:
-                            output = aim_model(inputs)
+                            output = actions_model(inputs)
                             _, predicated = torch.max(output, dim=1)
 
                             probs = torch.softmax(output, dim=1)
                             prob = probs[0][predicated.item()]
                             if len(debug) > 0:
                                 debug += "\n"
-                            debug += f"Decision {KEYS_STATE_TO_STRING[predicated.item()]} :: chance {prob.item():.2f}       "
+                            debug += f"Model {action_models[action_model_index]}:: Decision {KEYS_STATE_TO_STRING[predicated.item()]} :: chance {prob.item():.2f}       "
 
                             if prob.item() > 0:  # 0.7:
                                 set_key_state(predicated.item())

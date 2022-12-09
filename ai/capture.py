@@ -6,16 +6,16 @@ import cv2
 import numpy as np
 from threading import Thread
 from queue import Queue
-from windows import WindowCapture
-from utils import get_validated_input
+from ai.windows import WindowCapture
+from ai.utils import get_validated_input
 
 # list_window_names()
 
-FRAME_BUFFER: Union[Queue,None] = None
+FRAME_BUFFER: Union[Queue, None] = None
 
-PROJECT_NAME: Union[str,None] = None
+PROJECT_NAME: Union[str, None] = None
 
-PROJECT_PATH: Union[str,None] = None
+PROJECT_PATH: Union[str, None] = None
 
 FRAMES_PROCESSED = 0
 
@@ -50,15 +50,18 @@ def start_capture():
     FRAMES_PROCESSED = 0
     FRAMES_TOTAL = 0
 
+    capture_frame = False
+
     def toggle_capture():
-        global capture_frame
+        nonlocal capture_frame
         capture_frame = not capture_frame
 
     keyboard.add_hotkey('shift+r', callback=toggle_capture)
 
     FRAME_BUFFER = Queue()
 
-    PROJECT_NAME = get_validated_input('What Would You Like To Name This Project ?:',conversion_fn=lambda a: a.lower().strip())
+    PROJECT_NAME = get_validated_input(
+        'What Would You Like To Name This Project ?:', conversion_fn=lambda a: a.lower().strip())
 
     PROJECT_PATH = path.join(getcwd(), 'data', 'raw', PROJECT_NAME)
 
@@ -69,10 +72,9 @@ def start_capture():
 
     save_thread = Thread(group=None, target=process_frames_in_background)
 
-    capture_frame = False
-
     try:
-        print(f'Processed {FRAMES_PROCESSED} frames :: {FRAME_BUFFER.qsize()} Remaining          ', end='\r')
+        print(
+            f'Processed {FRAMES_PROCESSED} frames :: {FRAME_BUFFER.qsize()} Remaining          ', end='\r')
         save_thread.start()
         window_capture = WindowCapture("osu!")
         try:

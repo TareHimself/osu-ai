@@ -5,8 +5,7 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 from tqdm import tqdm
-from constants import PLAY_AREA_CAPTURE_PARAMS, GAME_CURSOR, BUTTON_CLICKED_COLOR, BUTTON_CAPTURE_WIDTH, BUTTON_CAPTURE_HEIGHT, FINAL_RESIZE_PERCENT, PLAY_AREA_WIDTH_HEIGHT
-from windows import derive_capture_params
+from ai.constants import PLAY_AREA_CAPTURE_PARAMS, GAME_CURSOR, BUTTON_CLICKED_COLOR, BUTTON_CAPTURE_WIDTH, BUTTON_CAPTURE_HEIGHT, FINAL_RESIZE_PERCENT, PLAY_AREA_WIDTH_HEIGHT
 
 trans = transforms.ToTensor()
 
@@ -179,19 +178,18 @@ class OsuDataset(torch.utils.data.Dataset):
                     continue
 
                 image, key_state, cursor = result
-
                 action_data.append(key_state)
                 cursor_data.append(cursor)
                 image_data.append(trans(image).numpy())
 
                 # cv2.imshow("Test", image)
-                # cv2.waitKey(0)
+                # cv2.waitKey(1)
 
             except Exception as e:
                 print('ERROR WHILE LOADING', img_path, e)
 
-        np.save(self.processed_data_path, [
-                image_data, cursor_data, action_data])
+        np.save(self.processed_data_path, np.array([
+                image_data, cursor_data, action_data], dtype=object))
         self.images = image_data
         self.labels = action_data if self.is_actions else cursor_data
 

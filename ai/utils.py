@@ -1,6 +1,6 @@
 from os import listdir, path, getcwd
 from typing import Callable
-
+from ai.constants import RAW_DATA_DIR
 import torch
 
 
@@ -18,11 +18,13 @@ def get_models(prefix="") -> list[str]:
 
 
 def get_datasets() -> list[str]:
-    pass
+    return listdir(RAW_DATA_DIR)
+
 
 def load_model_data(model):
     return torch.load(path.normpath(path.join(
         getcwd(), 'models', model)))
+
 
 def get_validated_input(prompt="You forgot to put your own prompt", validate_fn=lambda a: len(a.strip()) != 0,
                         conversion_fn=lambda a: a.strip()):
