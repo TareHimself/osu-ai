@@ -4,10 +4,14 @@ import cv2
 import numpy as np
 import torch
 import torchvision.transforms as transforms
+from queue import Queue
+from threading import Thread
 from tqdm import tqdm
 from ai.constants import PLAY_AREA_CAPTURE_PARAMS, GAME_CURSOR, BUTTON_CLICKED_COLOR, BUTTON_CAPTURE_WIDTH, BUTTON_CAPTURE_HEIGHT, FINAL_RESIZE_PERCENT, PLAY_AREA_WIDTH_HEIGHT
 
-trans = transforms.ToTensor()
+image_to_pytorch_image = transforms.ToTensor()
+
+INVALID_KEY_STATE = "An Invalid State"
 
 KEY_STATES = {
     "00": 0,
@@ -66,10 +70,11 @@ def get_cursor_position(play_field: np.array):
 
     _min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(result, None)
 
-    return min_loc + np.array([int(len(GAME_CURSOR[0]) / 2), int(len(GAME_CURSOR[1]) / 2)])
+    return (min_loc + np.array([int(len(GAME_CURSOR[0]) / 2), int(len(GAME_CURSOR[1]) / 2)])) / np.array([len(play_field[0]), len(play_field[1])])
 
 
 def get_buttons_state(image):
+    global delta_storage
     osu_buttons = image[960:960 +
                         BUTTON_CAPTURE_HEIGHT, 1760:1760 + (BUTTON_CAPTURE_WIDTH * 2)].copy()
 
@@ -88,59 +93,100 @@ def get_buttons_state(image):
                                                               osu_left_button)), int(
         get_press_state('right', osu_right_button))
 
-    return KEY_STATES.get(
-        f"{left_press_state}{right_press_state}", "invalid")
+    final_state = KEY_STATES.get(
+        f"{left_press_state}{right_press_state}", INVALID_KEY_STATE)
+
+    if final_state == INVALID_KEY_STATE:
+        delta_storage = {}
+        final_state = '00'
+
+    return KEY_STATES
+    return
 
 
-def extract_data_from_image(image_path):
-    global delta_storage
-
-    osu_screenshot = cv2.imread(image_path, cv2.IMREAD_COLOR)
-
-    key_state = get_buttons_state(osu_screenshot)
-
-    osu_play_area = osu_screenshot[
+def get_resized_play_area(screenshot):
+    play_area = screenshot[
         PLAY_AREA_CAPTURE_PARAMS[3]:PLAY_AREA_CAPTURE_PARAMS[3] + PLAY_AREA_CAPTURE_PARAMS[1],
         PLAY_AREA_CAPTURE_PARAMS[2]:PLAY_AREA_CAPTURE_PARAMS[2] + PLAY_AREA_CAPTURE_PARAMS[0]].copy()
 
-    resized_play_area = cv2.resize(osu_play_area, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+    return cv2.resize(play_area, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
         PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
 
-    resized_play_area_grey = cv2.cvtColor(
-        resized_play_area, cv2.COLOR_BGR2GRAY)
 
+def transform_resized(image):
+    grayed = cv2.cvtColor(
+        image, cv2.COLOR_BGR2GRAY)
+
+    normalized = np.stack(
+        [grayed, grayed, grayed], axis=-1) / 255
+
+    return image_to_pytorch_image(normalized).numpy()
+
+
+def extract_actions_from_image(osu_screenshot):
     # print("Key State:", key_state)
+
     # cv2.imshow(
-    #     f"debug", resized_play_area_grey)
+    #     f"debug", cv2.circle(resized_play_area_grey, get_cursor_position(
+    #         resized_play_area), 20, (0, 0, 255), 20))
     # cv2.waitKey(0)
 
     # print(PLAY_AREA_WIDTH_HEIGHT)
-    if key_state == 'invalid':
-        delta_storage = {}
-        return None
+    return [transform_resized(get_resized_play_area(osu_screenshot)), get_buttons_state(osu_screenshot)]
 
-    return [np.stack([resized_play_area_grey, resized_play_area_grey, resized_play_area_grey], axis=-1), key_state, get_cursor_position(osu_play_area) / PLAY_AREA_WIDTH_HEIGHT]
+
+def extract_aim_from_image(osu_screenshot):
+    resized_play_area = get_resized_play_area(osu_screenshot)
+
+    return [transform_resized(resized_play_area), get_cursor_position(resized_play_area)]
+
+
+class ImageProcessor:
+    def __init__(self, project_path, images) -> None:
+        self.processed = []
+        self.project_path = project_path
+        self.images = images
+        self.buff = Queue()
+        self.loader = tqdm(total=len(images),
+                           desc=f"Processing Screenshots :")
+        self.disk_thread = Thread(
+            target=self.load_images, daemon=True, group=None)
+
+    def load_images(self):
+        for image_path in self.images:
+            self.buff.put(cv2.imread(
+                path.join(self.project_path, image_path), cv2.IMREAD_COLOR))
+        self.buff.put(None)
+
+    def process_images(self, extract_actions=True):
+        self.disk_thread.start()
+        data = self.buff.get()
+        while data is not None:
+            self.processed.append(extract_actions_from_image(
+                data) if extract_actions else extract_aim_from_image(data))
+            self.loader.update()
+            data = self.buff.get()
+        return np.array(self.processed, dtype=object)
 
 
 class OsuDataset(torch.utils.data.Dataset):
 
-    def __init__(self, project_name: str, frame_latency=3, train_actions=True, force_rebuild=False) -> None:
+    def __init__(self, project_name: str, frame_latency=3, is_actions=True, force_rebuild=False) -> None:
         self.project = project_name
-        self.project_path = path.normpath(
-            path.join(getcwd(), 'data', 'raw', project_name))
-        self.processed_data_path = path.normpath(path.join(
-            getcwd(), 'data', 'processed', f"{project_name}.npy"))
+
+        self.project_path = path.join(getcwd(), 'data', 'raw', project_name)
+        self.processed_data_path = path.join(getcwd(
+        ), 'data', 'processed', f"{'actions_' if is_actions else 'aim_'}{project_name}.npy")
         self.images = []
         self.labels = []
-        self.is_actions = train_actions
         self.frame_latency = frame_latency
+        self.is_actions = is_actions
 
         if not force_rebuild and path.exists(self.processed_data_path):
-            image_data, cursor_data, action_data = np.load(
+            loaded_data = np.load(
                 self.processed_data_path, allow_pickle=True)
-
-            self.images = list(image_data)
-            self.labels = list(action_data if self.is_actions else cursor_data)
+            self.images = list(loaded_data[:, 0])
+            self.labels = list(loaded_data[:, 1])
         else:
             self.make_training_data()
 
@@ -162,36 +208,19 @@ class OsuDataset(torch.utils.data.Dataset):
 
         images = listdir(self.project_path)
 
-        images.sort(key=lambda x: int(
-            re.search(r"(?:[a-zA-Z]?)([0-9]+).png", x).groups()[0]))
+        if self.is_actions:
+            images.sort(key=lambda x: int(
+                re.search(r"(?:[a-zA-Z]?)([0-9]+).png", x).groups()[0]))
 
-        image_data = []
-        cursor_data = []
-        action_data = []
-        for img_path in tqdm(images, f"Processing Dataset {self.project} :"):
-            try:
+        processor = ImageProcessor(self.project_path, images)
 
-                result = extract_data_from_image(
-                    path.normpath(path.join(self.project_path, img_path)))
+        processed_data = processor.process_images(self.is_actions)
 
-                if result is None:
-                    continue
+        np.save(self.processed_data_path, processed_data)
 
-                image, key_state, cursor = result
-                action_data.append(key_state)
-                cursor_data.append(cursor)
-                image_data.append(trans(image).numpy())
+        self.images = list(processed_data[:, 0])
 
-                # cv2.imshow("Test", image)
-                # cv2.waitKey(1)
-
-            except Exception as e:
-                print('ERROR WHILE LOADING', img_path, e)
-
-        np.save(self.processed_data_path, np.array([
-                image_data, cursor_data, action_data], dtype=object))
-        self.images = image_data
-        self.labels = action_data if self.is_actions else cursor_data
+        self.labels = list(processed_data[:, 1])
 
     def __getitem__(self, idx):
         return self.images[idx], self.labels[idx]

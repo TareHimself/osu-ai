@@ -32,7 +32,7 @@ def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
 
     # print(train_set[0][0].shape, train_set[1000:1050][1])
 
-    model = ActionsNet().to(PYTORCH_DEVICE)
+    model = ActionsNet().type(torch.FloatTensor).to(PYTORCH_DEVICE)
 
     if checkpoint_model:
         data = load_model_data(checkpoint_model)
@@ -49,7 +49,7 @@ def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
             running_loss = 0
             for idx, data in enumerate(osu_data_loader):
                 images, results = data
-                images = images.to(PYTORCH_DEVICE)
+                images = images.type(torch.FloatTensor).to(PYTORCH_DEVICE)
                 results = results.type(torch.LongTensor).to(PYTORCH_DEVICE)
 
                 optimizer.zero_grad()
@@ -90,13 +90,13 @@ def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
         path.join(save_path, f"model_action_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
 
 
-def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
+def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=16,
                   epochs=1, learning_rate=0.0001, project_name=""):
     if len(project_name.strip()) == 0:
         project_name = dataset
 
     train_set = OsuDataset(project_name=dataset,
-                           frame_latency=2, train_actions=False)
+                           frame_latency=2, is_actions=False)
 
     osu_data_loader = DataLoader(
         train_set,
@@ -129,7 +129,8 @@ def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save
             running_loss = 0
             for idx, data in enumerate(osu_data_loader):
                 images, expected = data
-                images: torch.Tensor = images.to(PYTORCH_DEVICE)
+                images: torch.Tensor = images.type(
+                    torch.FloatTensor).to(PYTORCH_DEVICE)
                 expected: torch.Tensor = expected.type(
                     torch.FloatTensor).to(PYTORCH_DEVICE)
 

@@ -43,7 +43,7 @@ def toggle_capture():
     do_prediction = not do_prediction
 
 
-keyboard.add_hotkey('shift+r', callback=toggle_capture)
+keyboard.add_hotkey('\\', callback=toggle_capture)
 
 
 def start_play(time_between_frames=0):
@@ -111,7 +111,7 @@ def start_play(time_between_frames=0):
 
                     # cv2.imshow("Debug", cv_img)
                     # cv2.waitKey(1)
-                    stacked = np.stack([cv_img, cv_img, cv_img], axis=-1)
+                    stacked = np.stack([cv_img, cv_img, cv_img], axis=-1) / 255
 
                     if do_prediction:
                         converted_frame = transform(stacked)
@@ -126,10 +126,10 @@ def start_play(time_between_frames=0):
                             output = aim_model(inputs)
                             mouse_x_percent, mouse_y_percent = output[0]
                             position = (
-                                PLAY_AREA_CAPTURE_PARAMS[2] + int(
-                                    mouse_x_percent * PLAY_AREA_CAPTURE_PARAMS[0]),
+                                PLAY_AREA_CAPTURE_PARAMS[2] + int((
+                                    mouse_x_percent * PLAY_AREA_CAPTURE_PARAMS[0]) / FINAL_RESIZE_PERCENT),
                                 PLAY_AREA_CAPTURE_PARAMS[3] + int(
-                                    mouse_y_percent * PLAY_AREA_CAPTURE_PARAMS[1]))
+                                    (mouse_y_percent * PLAY_AREA_CAPTURE_PARAMS[1]) / FINAL_RESIZE_PERCENT))
                             win32api.SetCursorPos(position)
                             debug += f"Cursor Position {position}        "
 
