@@ -89,29 +89,22 @@ class AimNet(torch.nn.Module):
     def __init__(self):
         super().__init__()
         # resnet18()
-        self.conv = resnet50()
+        self.conv = resnet18(weights=ResNet18_Weights.DEFAULT)
         num_ftrs = self.conv.fc.in_features
         self.conv.fc = nn.Sequential(
-            nn.Linear(num_ftrs, 1024),
+            nn.Linear(num_ftrs, 128),
             nn.ReLU(),
-            nn.Linear(1024, 512),
+            nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Linear(512, 256),
+            nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(256, 128),
+            nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(128, 128),
-            nn.ReLU(),
-            nn.Linear(128, 128),
-            nn.ReLU(),
-            nn.Linear(128, 128),
-            nn.ReLU(),
-            nn.Linear(128, 2),
-
+            nn.Linear(64, 2),
         )
 
     def forward(self, images):

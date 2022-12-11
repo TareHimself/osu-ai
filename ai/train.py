@@ -17,20 +17,18 @@ PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 SAVE_PATH = path.normpath(path.join(getcwd(), 'models'))
 
 
-def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
+def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=32,
                      epochs=1, learning_rate=0.0001, project_name=""):
     if len(project_name.strip()) == 0:
         project_name = dataset
 
-    train_set = OsuDataset(project_name=dataset, frame_latency=3)
+    train_set = OsuDataset(project_name=dataset, frame_latency=2)
 
     osu_data_loader = DataLoader(
         train_set,
         batch_size=batch_size,
         shuffle=True
     )
-
-    # print(train_set[0][0].shape, train_set[1000:1050][1])
 
     model = ActionsNet().type(torch.FloatTensor).to(PYTORCH_DEVICE)
 
@@ -90,13 +88,13 @@ def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
         path.join(save_path, f"model_action_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
 
 
-def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=16,
+def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=64,
                   epochs=1, learning_rate=0.0001, project_name=""):
     if len(project_name.strip()) == 0:
         project_name = dataset
 
     train_set = OsuDataset(project_name=dataset,
-                           frame_latency=2, is_actions=False)
+                           frame_latency=0, is_actions=False)
 
     osu_data_loader = DataLoader(
         train_set,

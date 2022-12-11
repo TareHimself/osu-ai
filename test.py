@@ -1,15 +1,12 @@
-from ai.dataset import OsuDataset
+
+import cv2
 import numpy as np
-data = OsuDataset('leia-2-5.41', train_actions=False)
+from datetime import datetime
 
-# test_arr = np.array([
-#     [1, 2, 3],
-#     [1, 2, 3],
-#     [1, 2, 3],
-#     [1, 2, 3],
-#     [1, 2, 3]
-# ], dtype=object)
+file_name = datetime.utcnow().strftime("%y%m%d%H%M%S%f")
+TEST_DATA_PATH = "D:\Github\osu-ai\data\\raw\circles\\3932.png"
 
-# print(test_arr[:, 0])
-
-print(data[0])
+image = cv2.imread(TEST_DATA_PATH)
+print()
+# cv2.imshow("debug", get_buttons_from_screenshot(image))
+# cv2.waitKey(0)

@@ -17,9 +17,10 @@ BUTTON_CAPTURE_WIDTH = 46
 PLAY_AREA_CAPTURE_PARAMS = derive_capture_params()
 PLAY_AREA_WIDTH_HEIGHT = np.array(
     [PLAY_AREA_CAPTURE_PARAMS[0], PLAY_AREA_CAPTURE_PARAMS[1]])
-FINAL_RESIZE_PERCENT = 0.3
+FINAL_RESIZE_PERCENT = 0.1
 cursor_mat = cv2.imread(path.normpath(
     path.join(ASSETS_DIR, 'cursor.png')), cv2.IMREAD_COLOR)
-GAME_CURSOR = cv2.resize(cursor_mat, (int(len(cursor_mat[0]) * FINAL_RESIZE_PERCENT), int(len(cursor_mat[1]) * FINAL_RESIZE_PERCENT)),interpolation=cv2.INTER_LINEAR)
-    
+GAME_CURSOR = cv2.resize(cursor_mat, (int(len(cursor_mat[0]) * FINAL_RESIZE_PERCENT), int(
+    len(cursor_mat[1]) * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
+
 PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

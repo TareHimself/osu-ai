@@ -70,13 +70,16 @@ def get_cursor_position(play_field: np.array):
 
     _min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(result, None)
 
-    return (min_loc + np.array([int(len(GAME_CURSOR[0]) / 2), int(len(GAME_CURSOR[1]) / 2)])) / np.array([len(play_field[0]), len(play_field[1])])
+    return (min_loc + np.array([int(len(GAME_CURSOR[0]) / 2), int(len(GAME_CURSOR[1]) / 2)]))
 
 
-def get_buttons_state(image):
+def get_buttons_from_screenshot(screenshot):
+    return screenshot[960:960 +
+                      BUTTON_CAPTURE_HEIGHT, 1760:1760 + (BUTTON_CAPTURE_WIDTH * 2)].copy()
+
+
+def get_buttons_state(osu_buttons):
     global delta_storage
-    osu_buttons = image[960:960 +
-                        BUTTON_CAPTURE_HEIGHT, 1760:1760 + (BUTTON_CAPTURE_WIDTH * 2)].copy()
 
     half_b_h = int((BUTTON_CAPTURE_HEIGHT / 2))
     half_b_w = int((BUTTON_CAPTURE_WIDTH / 2))
@@ -98,10 +101,9 @@ def get_buttons_state(image):
 
     if final_state == INVALID_KEY_STATE:
         delta_storage = {}
-        final_state = '00'
+        final_state = 0
 
-    return KEY_STATES
-    return
+    return final_state
 
 
 def get_resized_play_area(screenshot):
@@ -123,22 +125,20 @@ def transform_resized(image):
     return image_to_pytorch_image(normalized).numpy()
 
 
-def extract_actions_from_image(osu_screenshot):
-    # print("Key State:", key_state)
-
-    # cv2.imshow(
-    #     f"debug", cv2.circle(resized_play_area_grey, get_cursor_position(
-    #         resized_play_area), 20, (0, 0, 255), 20))
-    # cv2.waitKey(0)
+def extract_actions_from_image(area, buttons):
 
     # print(PLAY_AREA_WIDTH_HEIGHT)
-    return [transform_resized(get_resized_play_area(osu_screenshot)), get_buttons_state(osu_screenshot)]
+    return [transform_resized(area), get_buttons_state(buttons)]
 
 
 def extract_aim_from_image(osu_screenshot):
-    resized_play_area = get_resized_play_area(osu_screenshot)
 
-    return [transform_resized(resized_play_area), get_cursor_position(resized_play_area)]
+    # cv2.imshow(
+    #     f"debug", cv2.circle(resized_play_area, get_cursor_position(
+    #         resized_play_area), 5, (0, 0, 255), 5))
+    # cv2.waitKey(0)
+
+    return [transform_resized(osu_screenshot), get_cursor_position(osu_screenshot) / np.array([len(osu_screenshot[0]), len(osu_screenshot[1])])]
 
 
 class ImageProcessor:
@@ -149,21 +149,27 @@ class ImageProcessor:
         self.buff = Queue()
         self.loader = tqdm(total=len(images),
                            desc=f"Processing Screenshots :")
-        self.disk_thread = Thread(
-            target=self.load_images, daemon=True, group=None)
 
-    def load_images(self):
+    def load_images(self, load_buttons=False):
         for image_path in self.images:
-            self.buff.put(cv2.imread(
-                path.join(self.project_path, image_path), cv2.IMREAD_COLOR))
+            area_image = cv2.imread(
+                path.join(self.project_path, 'area', image_path), cv2.IMREAD_COLOR)
+            button_image = cv2.imread(
+                path.join(self.project_path, 'buttons', image_path), cv2.IMREAD_COLOR) if load_buttons else None
+            self.buff.put([area_image, button_image])
         self.buff.put(None)
 
     def process_images(self, extract_actions=True):
-        self.disk_thread.start()
+        Thread(target=self.load_images, daemon=True, group=None,
+               kwargs={"load_buttons": extract_actions}).start()
         data = self.buff.get()
         while data is not None:
-            self.processed.append(extract_actions_from_image(
-                data) if extract_actions else extract_aim_from_image(data))
+            area, buttons = data
+            if extract_actions:
+                self.processed.append(
+                    extract_actions_from_image(area, buttons))
+            else:
+                self.processed.append(extract_aim_from_image(area))
             self.loader.update()
             data = self.buff.get()
         return np.array(self.processed, dtype=object)
@@ -206,7 +212,7 @@ class OsuDataset(torch.utils.data.Dataset):
 
         delta_storage = {}
 
-        images = listdir(self.project_path)
+        images = listdir(path.join(self.project_path, 'area'))
 
         if self.is_actions:
             images.sort(key=lambda x: int(

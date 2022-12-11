@@ -125,11 +125,12 @@ def start_play(time_between_frames=0):
                         if aim_model:
                             output = aim_model(inputs)
                             mouse_x_percent, mouse_y_percent = output[0]
+                            mouse_x_scaled = int(
+                                (mouse_x_percent * len(cv_img[0])) / FINAL_RESIZE_PERCENT)
+                            mouse_y_scaled = int(
+                                (mouse_y_percent * len(cv_img[1])) / FINAL_RESIZE_PERCENT)
                             position = (
-                                PLAY_AREA_CAPTURE_PARAMS[2] + int((
-                                    mouse_x_percent * PLAY_AREA_CAPTURE_PARAMS[0]) / FINAL_RESIZE_PERCENT),
-                                PLAY_AREA_CAPTURE_PARAMS[3] + int(
-                                    (mouse_y_percent * PLAY_AREA_CAPTURE_PARAMS[1]) / FINAL_RESIZE_PERCENT))
+                                PLAY_AREA_CAPTURE_PARAMS[2] + mouse_x_scaled, PLAY_AREA_CAPTURE_PARAMS[3] + mouse_y_scaled)
                             win32api.SetCursorPos(position)
                             debug += f"Cursor Position {position}        "
 
@@ -139,19 +140,17 @@ def start_play(time_between_frames=0):
 
                             probs = torch.softmax(output, dim=1)
                             prob = probs[0][predicated.item()]
-                            if len(debug) > 0:
-                                debug += "\n"
-                            debug += f"Model {action_models[action_model_index]}:: Decision {KEYS_STATE_TO_STRING[predicated.item()]} :: chance {prob.item():.2f}       "
+                            debug += f"Decision {KEYS_STATE_TO_STRING[predicated.item()]} :: chance {prob.item():.2f}       "
 
                             if prob.item() > 0:  # 0.7:
                                 set_key_state(predicated.item())
 
                         print(debug, end='\r')
 
-                    elapsed = time.time() - start
-                    wait_time = time_between_frames - elapsed
-                    if wait_time > 0:
-                        time.sleep(wait_time)
+                    # elapsed = time.time() - start
+                    # wait_time = time_between_frames - elapsed
+                    # if wait_time > 0:
+                    #     time.sleep(wait_time)
         except KeyboardInterrupt as e:
             pass
     except Exception as e:
