@@ -8,8 +8,8 @@ import cv2
 import numpy as np
 from threading import Thread
 from queue import Queue
-from ai.windows import WindowCapture
-from ai.utils import get_validated_input
+from windows import WindowCapture
+from utils import get_validated_input
 from ai.dataset import get_resized_play_area, get_buttons_from_screenshot
 
 # list_window_names()

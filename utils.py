@@ -1,6 +1,6 @@
 from os import listdir, path, getcwd
 from typing import Callable
-from ai.constants import RAW_DATA_DIR
+from constants import RAW_DATA_DIR
 import torch
 
 

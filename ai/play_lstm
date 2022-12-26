@@ -1,3 +1,4 @@
+import traceback
 import keyboard
 from windows import WindowCapture
 import time
@@ -46,7 +47,7 @@ def toggle_capture():
 keyboard.add_hotkey('\\', callback=toggle_capture)
 
 
-def start_play(time_between_frames=0):
+def start_play(time_between_frames=.05):
     global do_prediction
     try:
         do_prediction = False
@@ -99,27 +100,35 @@ def start_play(time_between_frames=0):
             aim_model.eval()
 
         print("Configuration Ready,Press 'Shift + R' To Toggle the model(s)")
-        fps = 0
+        MAX_FRAME_WINDOW = 12
         try:
+            buff = []
             while True:
                 start = time.time()
-                debug = f"FPS {fps:.4f} "
                 frame = window_capture.capture(*PLAY_AREA_CAPTURE_PARAMS)
                 if frame is not None:
-                    cv_img = cv2.resize(
+                    cv_img = cv2.cvtColor(cv2.resize(
                         frame, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
-                            PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
+                            PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR),
+                        cv2.COLOR_BGR2GRAY)
 
                     # cv2.imshow("Debug", cv_img)
-                    # cv2.waitKey(1) np.stack([cv_img, cv_img, cv_img], axis=-1)
-                    stacked = cv_img / 255
+                    # cv2.waitKey(1)
+                    stacked = np.stack([cv_img, cv_img, cv_img], axis=-1) / 255
+                    converted_frame = transform(stacked)
+                    if len(buff) == 0:
+                        buff = [converted_frame for x in range(
+                            MAX_FRAME_WINDOW)]
+                    else:
+                        buff.pop(0)
+                        buff.append(converted_frame)
 
                     if do_prediction:
-                        converted_frame = transform(stacked)
-
-                        inputs = converted_frame.reshape(
-                            (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2])).type(
+                        #converted_frame.reshape((1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2])).type(torch.FloatTensor)
+                        inputs = torch.stack(buff).type(
                             torch.FloatTensor).to(PYTORCH_DEVICE)
+
+                        debug = ""
 
                         if aim_model:
                             output = aim_model(inputs)
@@ -135,18 +144,22 @@ def start_play(time_between_frames=0):
 
                         if actions_model:
                             output = actions_model(inputs)
-                            _, predicated = torch.max(output, dim=1)
+                            debug = torch.argmax(output, dim=1)
+                            set_key_state(debug[MAX_FRAME_WINDOW - 1].item())
+                            # probs = torch.softmax(output, dim=1)
+                            # prob = probs[0][predicated.item()]
+                            # debug += f"Decision {KEYS_STATE_TO_STRING[predicated.item()]} :: chance {prob.item():.2f}       "
 
-                            probs = torch.softmax(output, dim=1)
-                            prob = probs[0][predicated.item()]
-                            debug += f"Decision {KEYS_STATE_TO_STRING[predicated.item()]} :: chance {prob.item():.2f}       "
+                            # if prob.item() > 0:  # 0.7:
+                            #     set_key_state(predicated.item())
 
-                            if prob.item() > 0:  # 0.7:
-                                set_key_state(predicated.item())
+                        print(debug, end='\r')
 
-                fps = 1 / (time.time() - start)
-                print(debug, end='\r')
+                    # elapsed = time.time() - start
+                    # wait_time = time_between_frames - elapsed
+                    # if wait_time > 0:
+                    #     time.sleep(wait_time)
         except KeyboardInterrupt as e:
             pass
     except Exception as e:
-        print(e)
+        print(e, traceback.format_exc())

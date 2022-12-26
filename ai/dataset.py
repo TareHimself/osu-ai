@@ -7,7 +7,7 @@ import torchvision.transforms as transforms
 from queue import Queue
 from threading import Thread
 from tqdm import tqdm
-from ai.constants import PLAY_AREA_CAPTURE_PARAMS, GAME_CURSOR, BUTTON_CLICKED_COLOR, BUTTON_CAPTURE_WIDTH, BUTTON_CAPTURE_HEIGHT, FINAL_RESIZE_PERCENT, PLAY_AREA_WIDTH_HEIGHT
+from constants import PLAY_AREA_CAPTURE_PARAMS, GAME_CURSOR, BUTTON_CLICKED_COLOR, BUTTON_CAPTURE_WIDTH, BUTTON_CAPTURE_HEIGHT, FINAL_RESIZE_PERCENT, PLAY_AREA_WIDTH_HEIGHT
 
 image_to_pytorch_image = transforms.ToTensor()
 
@@ -64,7 +64,7 @@ def get_press_state(unique_id, button):
 
 def get_cursor_position(play_field: np.array):
     result = cv2.matchTemplate(
-        play_field, GAME_CURSOR, cv2.TM_SQDIFF)  # , None, GAME_CURSOR)
+        play_field, GAME_CURSOR, cv2.TM_SQDIFF)
 
     cv2.normalize(result, result, 0, 1, cv2.NORM_MINMAX, -1)
 
@@ -116,11 +116,13 @@ def get_resized_play_area(screenshot):
 
 
 def transform_resized(image):
-    grayed = cv2.cvtColor(
-        image, cv2.COLOR_BGR2GRAY)
+    # grayed = cv2.cvtColor(
+    #     image, cv2.COLOR_BGR2GRAY)
 
-    normalized = np.stack(
-        [grayed, grayed, grayed], axis=-1) / 255
+    # normalized = np.stack(
+    #     [grayed, grayed, grayed], axis=-1) / 255
+
+    normalized = image / 255
 
     return image_to_pytorch_image(normalized).numpy()
 
@@ -134,8 +136,8 @@ def extract_actions_from_image(area, buttons):
 def extract_aim_from_image(osu_screenshot):
 
     # cv2.imshow(
-    #     f"debug", cv2.circle(resized_play_area, get_cursor_position(
-    #         resized_play_area), 5, (0, 0, 255), 5))
+    #     f"debug", cv2.circle(osu_screenshot, get_cursor_position(
+    #         osu_screenshot), 5, (0, 0, 255), 5))
     # cv2.waitKey(0)
 
     return [transform_resized(osu_screenshot), get_cursor_position(osu_screenshot) / np.array([len(osu_screenshot[0]), len(osu_screenshot[1])])]
