@@ -3,3 +3,5 @@
 */__pycache__/*
 /models/*
 *.pyc
+
+node_modules/*

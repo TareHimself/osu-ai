@@ -1,9 +1,11 @@
 from threading import Thread
+import time
 import cv2
 import win32gui
 import win32ui
 import win32con
 import numpy as np
+from queue import Queue
 
 
 class WindowCapture:
@@ -64,23 +66,37 @@ class WindowCapture:
 class WindowStream:
     def __init__(self, window_name=None, width=1920, height=1080, dx=0, dy=0) -> None:
         self.window_name = window_name
-        self.capture = WindowCapture(window_name)
         self.width = width
         self.height = height
         self.dx = dx
         self.dy = dy
+        self.frame_buffer = Queue()
+        self.frames = 0
+        Thread(daemon=True, group=None, target=self.capture).start()
+        Thread(daemon=True, group=None, target=self.do_frame_rate).start()
         Thread(daemon=True, group=None, target=self.stream).start()
+
+    def do_frame_rate(self):
+        while True:
+            time.sleep(1)
+            print(f"Capture FPS {self.frames:.0f}       ", end="\r")
+            self.frames = 0
+
+    def capture(self):
+        window_capture = WindowCapture(self.window_name)
+        while True:
+            frame = window_capture.capture(
+                self.width, self.height, self.dx, self.dy)
+            self.frame_buffer.put(frame)
+            self.frames += 1
 
     def stream(self):
         while True:
-            latest_image = None
-            while True:
-                frame = self.capture.capture(
-                    self.width, self.height, self.dx, self.dy)
-                if frame is not None:
-                    cv2.imshow(
-                        f"Stream of window {self.window_name if self.window_name is not None else 'Desktop'}", frame)
-                    cv2.waitKey(1)
+            frame = self.frame_buffer.get()
+            if frame is not None:
+                cv2.imshow(
+                    f"Stream of window {self.window_name if self.window_name is not None else 'Desktop'}", frame)
+                cv2.waitKey(1)
 
 
 def derive_capture_params(window_width=1920, window_height=1080, capture_height=1000):

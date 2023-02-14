@@ -1,17 +1,21 @@
-from gym import spaces
 import keyboard
 import numpy as np
-from rtgym.envs import RealTimeGymInterface
 import win32api
+import time
+import traceback
+import os
+from threading import Thread
 from agent.osu_player import OsuPlayer
 from constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS
+from rtgym.envs import RealTimeGymInterface
+from gym import spaces
 
 
 class OsuGymInterface:
     def __init__(self) -> None:
         super().__init__(self)
         self.osu = OsuPlayer()
-        self.target = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+        self.target = np.array([0.0, 0.0], dtype=np.float32)
         """
     Implement this class for your application
     """
@@ -25,7 +29,7 @@ class OsuGymInterface:
             control: np.array of the dimension of the action-space
         """
         if control is not None:
-            self.osu.do_action(control[0], control[1], control[2])
+            self.osu.do_action(control[0], control[1])
 
     def wait(self):
         self.send_control(self.get_default_action())
@@ -36,21 +40,33 @@ class OsuGymInterface:
             obs: must be a list
         Note: Do NOT put the action buffer in the returned obs (automated)
         """
-        # return obs
+        screen = self.osu.get_game()
+        self.osu.accuracy = 1
+        obs = [screen]
+        return obs
 
-        raise NotImplementedError
+    def get_obs_rew_terminated_info(self):
+        """Returns observation, reward, terminated and info from the device.
 
-    def get_obs_rew_done(self):
-        """
+        Note:
+
         Returns:
-            obs: list
+            obs: list (corresponding to the tuple from get_observation_space)
             rew: scalar
-            done: boolean
-        Note: Do NOT put the action buffer in obs (automated)
-        """
-        # return obs, rew, done
+            terminated: bool
+            info: dict
 
-        raise NotImplementedError
+        Note: Do NOT put the action buffer in obs (automated).
+        """
+        # return obs, rew, terminated, info
+
+        screen = self.osu.get_game()
+        acc = self.osu.get_accuracy()
+        obs = [screen]
+        rew = acc - 1
+        terminated = acc < 0.8
+        info = {}
+        return obs, rew, terminated, info
 
     def get_observation_space(self):
         """
@@ -58,16 +74,20 @@ class OsuGymInterface:
             observation_space: gym.spaces.Tuple
         Note: Do NOT put the action buffer here (automated)
         """
+
+        image_space = spaces.Box(
+            low=0, high=255, shape=(int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+                PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT), 3), dtype=np.uint8)
         # return spaces.Tuple(...)
 
-        raise NotImplementedError
+        return spaces.Tuple((image_space))
 
     def get_action_space(self):
         """
         Returns:
             action_space: gym.spaces.Box
         """
-        return spaces.Box(low=0, high=1.0, shape=(3,))
+        return spaces.Box(low=0, high=1.0, shape=(2,))
 
     def get_default_action(self):
         """
@@ -76,4 +96,4 @@ class OsuGymInterface:
         initial action at episode start
         """
 
-        return np.array([0.0, 0.0, 0.0], dtype='float32')
+        return np.array([0.0, 0.0], dtype='float32')

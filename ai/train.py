@@ -17,12 +17,13 @@ PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 SAVE_PATH = path.normpath(path.join(getcwd(), 'models'))
 
 
-def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
+def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
                      epochs=1, learning_rate=0.0001, project_name=""):
-    if len(project_name.strip()) == 0:
-        project_name = dataset
 
-    train_set = OsuDataset(project_name=dataset, frame_latency=2)
+    if len(project_name.strip()) == 0:
+        project_name = "-".join(datasets)
+
+    train_set = OsuDataset(datasets=datasets, frame_latency=2)
 
     osu_data_loader = DataLoader(
         train_set,
@@ -88,13 +89,13 @@ def train_action_net(dataset: str, force_rebuild=False, checkpoint_model=None, s
         path.join(save_path, f"model_action_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
 
 
-def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=8,
-                  epochs=1, learning_rate=0.0001, project_name=""):
+def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=32,
+                  epochs=1, learning_rate=0.0003, project_name=""):
     if len(project_name.strip()) == 0:
-        project_name = dataset
+        project_name = "-".join(datasets)
 
-    train_set = OsuDataset(project_name=dataset,
-                           frame_latency=2, is_actions=False)
+    train_set = OsuDataset(datasets=datasets,
+                           frame_latency=0, is_actions=False)
 
     osu_data_loader = DataLoader(
         train_set,
@@ -172,8 +173,18 @@ def train_aim_net(dataset: str, force_rebuild=False, checkpoint_model=None, save
 
 
 def get_train_data(data_type, datasets, datasets_prompt, models, models_prompt):
-    selected_dataset = get_validated_input(datasets_prompt, lambda a: a.strip().isnumeric() and (
-        0 <= int(a.strip()) < len(datasets)), lambda a: int(a.strip()))
+    def validate_datasets_selection(reciev: str):
+        try:
+            items = map(int, reciev.strip().split(","))
+            for item in items:
+                if not 0 <= item < len(datasets):
+                    return False
+            return True
+        except:
+            return False
+
+    selected_datasets = get_validated_input(
+        datasets_prompt, validate_datasets_selection, lambda a: map(int, a.strip().split(",")))
     checkpoint = None
     epochs = get_validated_input("How many epochs would you like to train for ?\n",
                                  lambda a: a.strip().isnumeric() and 0 <= int(a.strip()), lambda a: int(a.strip()))
@@ -183,7 +194,7 @@ def get_train_data(data_type, datasets, datasets_prompt, models, models_prompt):
             0 <= int(a.strip()) < len(models_prompt)), lambda a: int(a.strip()))
         checkpoint = models[checkpoint_index]
 
-    return data_type, datasets[selected_dataset], checkpoint, epochs
+    return data_type, list(map(lambda a: datasets[a], selected_datasets)), checkpoint, epochs
 
 
 def start_train():
@@ -195,7 +206,7 @@ def start_train():
     [2] Train Both
 """
 
-    dataset_prompt = "Please select a dataset from below:\n"
+    dataset_prompt = "Please select datasets from below seperated by a comma:\n"
     models_prompt = "Please select a model from below:\n"
     for i in range(len(datasets)):
         dataset_prompt += f"    [{i}] {datasets[i]}\n"

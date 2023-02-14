@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torchvision.models import resnet18, ResNet18_Weights, resnet50, ResNet50_Weights
 from constants import PYTORCH_DEVICE
 
@@ -60,6 +61,37 @@ from constants import PYTORCH_DEVICE
 #         return x
 
 
+class AimNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv = resnet18(weights=ResNet18_Weights.DEFAULT)
+        num_ftrs = self.conv.fc.in_features
+        self.conv.fc = nn.Linear(num_ftrs, 512)
+        self.fc = nn.Sequential([
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(64, 2)
+        ])
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.fc(x)
+        return x
+
+
 class ActionsNet(torch.nn.Module):
     """
     Works so far
@@ -70,7 +102,7 @@ class ActionsNet(torch.nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.conv = resnet18(weights=ResNet18_Weights.DEFAULT)
+        self.conv = resnet18(weights=None)
         num_ftrs = self.conv.fc.in_features
         self.conv.fc = nn.Linear(num_ftrs, 3)
 
@@ -119,20 +151,14 @@ class AimNet(torch.nn.Module):
     def __init__(self):
         super().__init__()
         # resnet18()
-        self.conv = resnet18(weights=ResNet18_Weights.DEFAULT)
+        self.conv = resnet50(weights=ResNet50_Weights.DEFAULT)
         num_ftrs = self.conv.fc.in_features
         self.conv.fc = nn.Sequential(
             nn.Linear(num_ftrs, 512),
             nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
             nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
             nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),

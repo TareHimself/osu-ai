@@ -20,101 +20,6 @@ KEY_STATES = {
 }
 
 
-def get_button_cell_color(img):
-    return img[0][0]
-
-
-def get_button_press_dist(button):
-    return np.linalg.norm(get_button_cell_color(
-        button) - BUTTON_CLICKED_COLOR)
-
-
-# stores the key data for the last processed frame (assumes all input is sequential)
-delta_storage = {}
-
-
-# 0 = no change, -1 = decreasing, 1 = increasing
-
-
-def get_press_state(unique_id, button):
-    global delta_storage
-    current_distance = get_button_press_dist(button)
-
-    if delta_storage.get(unique_id, None) is None:
-        delta_storage[unique_id] = [get_button_press_dist(button), 0]
-
-    old_distance, old_dir = delta_storage.get(unique_id)
-
-    diff = current_distance - old_distance
-    current_dir = 1 if diff > 0 else (-1 if diff < 0 else 0)
-
-    delta_storage[unique_id] = [current_distance, current_dir]
-
-    if current_dir == 0 and current_distance < 80:
-        return 1
-
-    if current_dir > 0:  # and old_dir <= 0:
-        return 0
-
-    if current_dir < 0:  # and old_dir > 0:
-        return 1
-
-    return 0
-
-
-def get_cursor_position(play_field: np.array):
-    result = cv2.matchTemplate(
-        play_field, GAME_CURSOR, cv2.TM_SQDIFF)
-
-    cv2.normalize(result, result, 0, 1, cv2.NORM_MINMAX, -1)
-
-    _min_val, _max_val, min_loc, _max_loc = cv2.minMaxLoc(result, None)
-
-    return (min_loc + np.array([int(len(GAME_CURSOR[0]) / 2), int(len(GAME_CURSOR[1]) / 2)]))
-
-
-def get_buttons_from_screenshot(screenshot):
-    return screenshot[960:960 +
-                      BUTTON_CAPTURE_HEIGHT, 1760:1760 + (BUTTON_CAPTURE_WIDTH * 2)].copy()
-
-
-def get_buttons_state(osu_buttons):
-    global delta_storage
-
-    half_b_h = int((BUTTON_CAPTURE_HEIGHT / 2))
-    half_b_w = int((BUTTON_CAPTURE_WIDTH / 2))
-
-    capture_area_l = 10
-
-    osu_left_button = osu_buttons[half_b_h - capture_area_l:half_b_h +
-                                  capture_area_l,
-                                  half_b_w - capture_area_l:half_b_w + capture_area_l]
-    osu_right_button = osu_buttons[half_b_h - capture_area_l:half_b_h + capture_area_l, half_b_w +
-                                   BUTTON_CAPTURE_WIDTH - capture_area_l:half_b_w + BUTTON_CAPTURE_WIDTH + capture_area_l]
-
-    left_press_state, right_press_state = int(get_press_state('left',
-                                                              osu_left_button)), int(
-        get_press_state('right', osu_right_button))
-
-    final_state = KEY_STATES.get(
-        f"{left_press_state}{right_press_state}", INVALID_KEY_STATE)
-
-    if final_state == INVALID_KEY_STATE:
-        delta_storage = {}
-        final_state = 0
-
-    return final_state
-
-
-def get_resized_play_area(screenshot):
-    play_area = screenshot[
-        PLAY_AREA_CAPTURE_PARAMS[3]:PLAY_AREA_CAPTURE_PARAMS[3] + PLAY_AREA_CAPTURE_PARAMS[1],
-        PLAY_AREA_CAPTURE_PARAMS[2]:PLAY_AREA_CAPTURE_PARAMS[2] + PLAY_AREA_CAPTURE_PARAMS[0]].copy()
-
-    return cv2.resize(play_area, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
-        PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
-
-
 def transform_resized(image):
     # grayed = cv2.cvtColor(
     #     image, cv2.COLOR_BGR2GRAY)
@@ -127,74 +32,101 @@ def transform_resized(image):
     return image_to_pytorch_image(normalized).numpy()
 
 
-def extract_actions_from_image(area, buttons):
-
-    # print(PLAY_AREA_WIDTH_HEIGHT)
-    return [transform_resized(area), get_buttons_state(buttons)]
-
-
-def extract_aim_from_image(osu_screenshot):
+def extract_data(area, state: str):
 
     # cv2.imshow(
-    #     f"debug", cv2.circle(osu_screenshot, get_cursor_position(
-    #         osu_screenshot), 5, (0, 0, 255), 5))
+    #     f"debug", area)
     # cv2.waitKey(0)
 
-    return [transform_resized(osu_screenshot), get_cursor_position(osu_screenshot) / np.array([len(osu_screenshot[0]), len(osu_screenshot[1])])]
+    keys, x, y = state.split(",")
+
+    # cv2.imshow(
+    #     f"debug", cv2.circle(area, (int((float(x.strip()) -
+    #                                      PLAY_AREA_CAPTURE_PARAMS[2])), int((float(y.strip()) -
+    #                                                                         PLAY_AREA_CAPTURE_PARAMS[3]))), 5, (0, 0, 255), 5))
+    # cv2.waitKey(0)
+
+    x = (float(x.strip()) -
+         PLAY_AREA_CAPTURE_PARAMS[2]) / PLAY_AREA_CAPTURE_PARAMS[0]
+
+    y = (float(y.strip()) -
+         PLAY_AREA_CAPTURE_PARAMS[3]) / PLAY_AREA_CAPTURE_PARAMS[1]
+
+    return [transform_resized(area), KEY_STATES.get(keys.strip(), 0), np.array([x, y])]
 
 
 class ImageProcessor:
-    def __init__(self, project_path, images) -> None:
-        self.processed = []
-        self.project_path = project_path
-        self.images = images
+    def __init__(self) -> None:
         self.buff = Queue()
-        self.loader = tqdm(total=len(images),
-                           desc=f"Processing Screenshots :")
 
-    def load_images(self, load_buttons=False):
-        for image_path in self.images:
-            area_image = cv2.imread(
-                path.join(self.project_path, 'area', image_path), cv2.IMREAD_COLOR)
-            button_image = cv2.imread(
-                path.join(self.project_path, 'buttons', image_path), cv2.IMREAD_COLOR) if load_buttons else None
-            self.buff.put([area_image, button_image])
+    def load_images(self, dataset_path, screenshot_ids, load_buttons=False):
+        for screenshot_id in screenshot_ids:
+            sct = cv2.imread(
+                path.join(dataset_path, 'display', screenshot_id), cv2.IMREAD_COLOR)
+
+            sct = cv2.resize(sct, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+                PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
+
+            f = open(path.join(dataset_path, 'state',
+                               screenshot_id[:-3] + "txt"))
+            state = f.read()
+            self.buff.put([sct, state])
         self.buff.put(None)
 
-    def process_images(self, extract_actions=True):
+    def process_images(self, loader_description, dataset, extract_actions=True):
+        dataset_path = path.join(getcwd(), 'data', 'raw', dataset)
+
+        screenshot_ids = listdir(path.join(dataset_path, 'display'))
+
+        if extract_actions:  # sort the play area so we can process the input properly
+            screenshot_ids.sort(key=lambda x: int(
+                re.search(r"([0-9]+).png", x).groups()[0]))
+
+        processed = []
+
+        loading_bar = tqdm(total=len(screenshot_ids),
+                           desc=loader_description)
+
         Thread(target=self.load_images, daemon=True, group=None,
-               kwargs={"load_buttons": extract_actions}).start()
-        data = self.buff.get()
+               kwargs={"dataset_path": dataset_path, "screenshot_ids": screenshot_ids}).start()  # load the images in a seperate thread
+
+        data = self.buff.get()  # get an image or none if we are done
         while data is not None:
-            area, buttons = data
-            if extract_actions:
-                self.processed.append(
-                    extract_actions_from_image(area, buttons))
-            else:
-                self.processed.append(extract_aim_from_image(area))
-            self.loader.update()
+            sct, state = data
+
+            result = None
+
+            result = extract_data(sct, state)
+
+            if result is not None:
+                processed.append(result)
+
+            # update the progress bar
+            loading_bar.update()
+
             data = self.buff.get()
-        return np.array(self.processed, dtype=object)
+        loading_bar.close()
+        return np.array(processed, dtype=object)
 
 
 class OsuDataset(torch.utils.data.Dataset):
 
-    def __init__(self, project_name: str, frame_latency=3, is_actions=True, force_rebuild=False) -> None:
-        self.project = project_name
+    def __init__(self, datasets: list[str], frame_latency=3, is_actions=True, force_rebuild=False) -> None:
+        self.datasets = datasets
 
-        self.project_path = path.join(getcwd(), 'data', 'raw', project_name)
-        self.processed_data_path = path.join(getcwd(
-        ), 'data', 'processed', f"{'actions_' if is_actions else 'aim_'}{project_name}.npy")
+        self.processed_path = path.join(getcwd(
+        ), 'data', 'processed', f"{'-'.join(datasets)}.npy")
         self.images = []
         self.labels = []
         self.frame_latency = frame_latency
         self.is_actions = is_actions
 
-        if not force_rebuild and path.exists(self.processed_data_path):
+        if not force_rebuild and path.exists(self.processed_path):
             loaded_data = np.load(
-                self.processed_data_path, allow_pickle=True)
+                self.processed_path, allow_pickle=True)
             self.images = list(loaded_data[:, 0])
-            self.labels = list(loaded_data[:, 1])
+            self.labels = list(loaded_data[:, 1]) if is_actions else list(
+                loaded_data[:, 2])
         else:
             self.make_training_data()
 
@@ -214,21 +146,21 @@ class OsuDataset(torch.utils.data.Dataset):
 
         delta_storage = {}
 
-        images = listdir(path.join(self.project_path, 'area'))
+        processor = ImageProcessor()
 
-        if self.is_actions:
-            images.sort(key=lambda x: int(
-                re.search(r"(?:[a-zA-Z]?)([0-9]+).png", x).groups()[0]))
+        processed_data = np.empty((0, 3))
 
-        processor = ImageProcessor(self.project_path, images)
+        for i in range(len(self.datasets)):
+            dataset = self.datasets[i]
+            processed_data = np.concatenate(
+                [processed_data, processor.process_images(f"Processing Dataset {dataset} ({i + 1}/{len(self.datasets)})", dataset, self.is_actions)])
 
-        processed_data = processor.process_images(self.is_actions)
-
-        np.save(self.processed_data_path, processed_data)
+        np.save(self.processed_path, processed_data)
 
         self.images = list(processed_data[:, 0])
 
-        self.labels = list(processed_data[:, 1])
+        self.labels = list(processed_data[:, 1]) if self.is_actions else list(
+            processed_data[:, 2])
 
     def __getitem__(self, idx):
         return self.images[idx], self.labels[idx]

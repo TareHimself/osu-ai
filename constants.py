@@ -17,7 +17,7 @@ BUTTON_CAPTURE_WIDTH = 46
 PLAY_AREA_CAPTURE_PARAMS = derive_capture_params()
 PLAY_AREA_WIDTH_HEIGHT = np.array(
     [PLAY_AREA_CAPTURE_PARAMS[0], PLAY_AREA_CAPTURE_PARAMS[1]])
-FINAL_RESIZE_PERCENT = 0.4
+FINAL_RESIZE_PERCENT = 0.1
 cursor_mat = cv2.imread(path.normpath(
     path.join(ASSETS_DIR, 'cursor.png')), cv2.IMREAD_COLOR)
 # cv2.imshow("debug", mask_mat * cursor_mat)

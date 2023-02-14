@@ -51,7 +51,7 @@ def start_play(time_between_frames=0):
     try:
         do_prediction = False
 
-        window_capture = WindowCapture("osu!")
+        window_capture = WindowCapture("osu! (development)")
 
         action_models = get_models('model_action_')
 
@@ -99,11 +99,11 @@ def start_play(time_between_frames=0):
             aim_model.eval()
 
         print("Configuration Ready,Press 'Shift + R' To Toggle the model(s)")
-        fps = 0
+        fps = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         try:
             while True:
                 start = time.time()
-                debug = f"FPS {fps:.4f} "
+                debug = f"FPS {sum(fps) / len(fps):.4f} "
                 frame = window_capture.capture(*PLAY_AREA_CAPTURE_PARAMS)
                 if frame is not None:
                     cv_img = cv2.resize(
@@ -124,12 +124,8 @@ def start_play(time_between_frames=0):
                         if aim_model:
                             output = aim_model(inputs)
                             mouse_x_percent, mouse_y_percent = output[0]
-                            mouse_x_scaled = int(
-                                (mouse_x_percent * len(cv_img[0])) / FINAL_RESIZE_PERCENT)
-                            mouse_y_scaled = int(
-                                (mouse_y_percent * len(cv_img[1])) / FINAL_RESIZE_PERCENT)
-                            position = (
-                                PLAY_AREA_CAPTURE_PARAMS[2] + mouse_x_scaled, PLAY_AREA_CAPTURE_PARAMS[3] + mouse_y_scaled)
+                            position = (int((mouse_x_percent * PLAY_AREA_CAPTURE_PARAMS[0]) + PLAY_AREA_CAPTURE_PARAMS[2]), int(
+                                (mouse_y_percent * PLAY_AREA_CAPTURE_PARAMS[1]) + PLAY_AREA_CAPTURE_PARAMS[3]))
                             win32api.SetCursorPos(position)
                             debug += f"Cursor Position {position}        "
 
@@ -144,7 +140,8 @@ def start_play(time_between_frames=0):
                             if prob.item() > 0:  # 0.7:
                                 set_key_state(predicated.item())
 
-                fps = 1 / (time.time() - start)
+                fps.append(1 / (time.time() - start))
+                fps.pop(0)
                 print(debug, end='\r')
         except KeyboardInterrupt as e:
             pass
