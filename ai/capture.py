@@ -6,12 +6,13 @@ from os import path, mkdir, getcwd, makedirs
 import time
 import keyboard
 import cv2
+from collections import deque
 import numpy as np
 from threading import Thread
 from queue import Queue
 from windows import WindowCapture
 from utils import FileWatcher, OsuSocketServer, get_validated_input
-from constants import PLAY_AREA_CAPTURE_PARAMS
+from constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS
 
 # list_window_names()
 
@@ -42,9 +43,11 @@ def process_frames_in_background():
             break
 
         sct, state = frame
+
         filename = f"{datetime.utcnow().strftime('%y%m%d%H%M%S%f')}"
 
-        cv2.imwrite(path.join(IMAGES_PATH, f"{filename}.png"), sct)
+        np.save(path.join(IMAGES_PATH,
+                f"{filename}"), sct, allow_pickle=True)
 
         with open(path.join(STATE_PATH, f"{filename}.txt"), "w") as data:
             data.write(state)
@@ -82,6 +85,10 @@ def start_capture():
 
     STATE_PATH = path.join(getcwd(), 'data', 'raw', PROJECT_NAME, 'state')
 
+    FRAME_BUFF_MAX = 3
+
+    FRAME_BUFF = deque(maxlen=FRAME_BUFF_MAX)
+
     if path.exists(IMAGES_PATH):
         shutil.rmtree(IMAGES_PATH)
     makedirs(IMAGES_PATH)
@@ -92,28 +99,32 @@ def start_capture():
 
     save_thread = Thread(group=None, target=process_frames_in_background)
 
-    socket_server = OsuSocketServer()
+    socket_server = OsuSocketServer(on_state_updated=lambda a: a)
 
     try:
         start = time.time()
         print(
             f'Processed {FRAMES_PROCESSED} frames :: {FRAME_BUFFER.qsize()} Remaining          ', end='\r')
+        MIN_FRAME_DELAY = 0.01
         save_thread.start()
         window_capture = WindowCapture("osu! (development)")
         try:
             while True:
                 start = time.time()
                 if capture_frame:
-                    frame = window_capture.capture(*PLAY_AREA_CAPTURE_PARAMS)
-                    if frame is not None:
-                        data = asyncio.run(
-                            socket_server.send_and_wait('state'))
-                        FRAME_BUFFER.put(
-                            [frame, data])
-                        FRAMES_TOTAL += 1
+                    frame, stacked = window_capture.capture(
+                        list(FRAME_BUFF), FRAME_BUFF_MAX, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+                            PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
+                    FRAME_BUFF.append(frame)
+
+                    data = asyncio.run(
+                        socket_server.send_and_wait('cap'))
+                    FRAME_BUFFER.put(
+                        [stacked, data])
+                    FRAMES_TOTAL += 1
 
                 elapsed = time.time() - start
-                wait_time = 0.01 - elapsed
+                wait_time = MIN_FRAME_DELAY - elapsed
                 if wait_time > 0:
                     time.sleep(wait_time)
 

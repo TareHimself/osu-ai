@@ -18,43 +18,86 @@ class WindowCapture:
                 WindowCapture.list_window_names()
                 raise Exception(
                     f"Window '{window_name}' Not Found Select window name from above")
+        self.num_captured = 0
+        self.wDC = None
+        self.dcObj = None
+        self.cDC = None
+        self.dataBitMap = None
 
-    def capture(self, width=1920, height=1080, dx=0, dy=0) -> np.ndarray:
-        width = int(width)
-        height = int(height)
-        wDC = win32gui.GetWindowDC(self.hwnd)
-        dcObj = win32ui.CreateDCFromHandle(wDC)
-        cDC = dcObj.CreateCompatibleDC()
-        dataBitMap = win32ui.CreateBitmap()
-        dataBitMap.CreateCompatibleBitmap(dcObj, width, height)
-        cDC.SelectObject(dataBitMap)
-        cDC.BitBlt((0, 0), (width, height), dcObj, (dx, dy), win32con.SRCCOPY)
+    def ensure_resources(self, width: int, height: int):
+        if self.num_captured > 50:
+            self.dcObj.DeleteDC()
+            self.cDC.DeleteDC()
+            win32gui.ReleaseDC(self.hwnd, self.wDC)
+            win32gui.DeleteObject(self.dataBitMap.GetHandle())
+            self.wDC = None
+            self.dcObj = None
+            self.cDC = None
+            self.dataBitMap = None
+            self.num_captured = 0
+
+        if self.wDC is None:
+            self.wDC = win32gui.GetWindowDC(self.hwnd)
+            self.dcObj = win32ui.CreateDCFromHandle(self.wDC)
+            self.cDC = self.dcObj.CreateCompatibleDC()
+            self.dataBitMap = win32ui.CreateBitmap()
+            self.dataBitMap.CreateCompatibleBitmap(self.dcObj, width, height)
+        self.num_captured += 1
+
+    def get_frame(self, resize: tuple[int, int], width: int, height: int, dx: int, dy: int, is_stacking=False):
+        self.ensure_resources(width, height)
+
+        self.cDC.SelectObject(self.dataBitMap)
+        self.cDC.BitBlt((0, 0), (width, height), self.dcObj,
+                        (dx, dy), win32con.SRCCOPY)
 
         # convert the raw data into a format opencv can read
         #dataBitMap.SaveBitmapFile(cDC, 'debug.bmp')
-        signedIntsArray = dataBitMap.GetBitmapBits(True)
-        img = np.frombuffer(signedIntsArray, dtype='uint8')
-        img.shape = (height, width, 4)
+        signedIntsArray = self.dataBitMap.GetBitmapBits(True)
+        frame = np.frombuffer(signedIntsArray, dtype='uint8')
+        frame.shape = (height, width, 4)
+        frame = np.ascontiguousarray(frame[..., :3])
+        frame = cv2.resize(frame, resize, interpolation=cv2.INTER_LINEAR)
+        if not is_stacking:
+            return frame
 
-        # free resources
-        dcObj.DeleteDC()
-        cDC.DeleteDC()
-        win32gui.ReleaseDC(self.hwnd, wDC)
-        win32gui.DeleteObject(dataBitMap.GetHandle())
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # drop the alpha channel, or cv.matchTemplate() will throw an error like:
-        #   error: (-215:Assertion failed) (depth == CV_8U || depth == CV_32F) && type == _templ.type()
-        #   && _img.dims() <= 2 in function 'cv::matchTemplate'
-        img = img[..., :3]
+    def capture(self, prev_frames=[], stack_num=0, resize: tuple[int, int] = (1920, 1080), width=1920, height=1080, dx=0, dy=0) -> np.ndarray:
+        width = int(width)
+        height = int(height)
 
-        # make image C_CONTIGUOUS to avoid errors that look like:
-        #   File ... in draw_rectangles
-        #   TypeError: an integer is required (got type tuple)
-        # see the discussion here:
-        # https://github.com/opencv/opencv/issues/14866#issuecomment-580207109
-        img = np.ascontiguousarray(img)
+        self.ensure_resources(width, height)
 
-        return img
+        is_stacking = stack_num != 0
+        frame = self.get_frame(resize, width, height, dx, dy, is_stacking)
+
+        if not is_stacking:
+            return frame
+
+        prev_count = len(prev_frames)
+        needed_count = stack_num - prev_count
+        final_frames = []
+        if needed_count > 1:
+            final_frames = prev_frames + [frame for _ in range(needed_count)]
+        else:
+            final_frames = prev_frames[prev_count -
+                                       (stack_num - 1):prev_count] + [frame]
+
+        return [frame, np.stack(final_frames)]
+
+    # Deleting (Calling destructor)
+    def __del__(self):
+        if self.wDC is not None:
+            self.dcObj.DeleteDC()
+            self.cDC.DeleteDC()
+            win32gui.ReleaseDC(self.hwnd, self.wDC)
+            win32gui.DeleteObject(self.dataBitMap.GetHandle())
+            self.wDC = None
+            self.dcObj = None
+            self.cDC = None
+            self.dataBitMap = None
+            self.num_captured = 0
 
     def list_window_names():
         def winEnumHandler(hwnd, ctx):

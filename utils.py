@@ -2,7 +2,7 @@ import asyncio
 from os import listdir, path, getcwd
 import os
 import socket
-from threading import Thread
+from threading import Thread, Timer
 import time
 import traceback
 from typing import Callable
@@ -10,6 +10,8 @@ import uuid
 from constants import RAW_DATA_DIR
 import torch
 from queue import Queue
+
+MESSAGES_SENT = 0
 
 
 def get_models(prefix="") -> list[str]:
@@ -29,9 +31,9 @@ def get_datasets() -> list[str]:
     return listdir(RAW_DATA_DIR)
 
 
-def load_model_data(model):
-    return torch.load(path.normpath(path.join(
-        getcwd(), 'models', model)))
+def get_model_path(model):
+    return path.normpath(path.join(
+        getcwd(), 'models', model))
 
 
 def get_validated_input(prompt="You forgot to put your own prompt", validate_fn=lambda a: len(a.strip()) != 0,
@@ -75,11 +77,11 @@ class FileWatcher(Thread):
 
 
 class OsuSocketServer:
-    def __init__(self, on_message=lambda a: a) -> None:
+    def __init__(self, on_state_updated) -> None:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.bind(("127.0.0.1", 12000))
-        self.client = None
-        self.on_message = on_message
+        self.socket.bind(("127.0.0.1", 9200))
+        self.client = ("127.0.0.1", 9500)
+        self.on_state_updated = on_state_updated
         self.pending_messages = {}
         self.active = True
         self.t1 = Thread(group=None, target=self.recieve_messages, daemon=True)
@@ -87,18 +89,21 @@ class OsuSocketServer:
 
     def on_message_internal(self, message):
         message_id, content = message.split('|')
-
+        if content == "MAP_BEGIN" or content == "MAP_END":
+            self.on_state_updated(content)
+            return
+        #print("<<", content)
         if message_id in self.pending_messages.keys():
-            task, loop = self.pending_messages[message_id]
+            task, loop, timr = self.pending_messages[message_id]
             loop.call_soon_threadsafe(task.set_result, content)
+            del self.pending_messages[message_id]
+            timr.cancel()
 
     def recieve_messages(self):
         while True:
             try:
                 message, address = self.socket.recvfrom(1024)
-                self.client = address
                 message = message.decode("utf-8")
-                self.on_message(message)
                 self.on_message_internal(message)
             except socket.timeout:
                 break
@@ -106,18 +111,24 @@ class OsuSocketServer:
         self.socket.close()
 
     def send(self, message: str):
+        self.socket.sendto(
+            f"NONE|{message}".encode("utf-8"), self.client)
 
-        if self.client is not None:
-            self.socket.sendto(
-                f"NONE|{message}".encode("utf-8"), self.client)
+    def cancel_send_and_wait(self, m_id, value):
+        if m_id in self.pending_messages.keys():
+            task, loop, timr = self.pending_messages[m_id]
+            loop.call_soon_threadsafe(task.set_result, value)
+            del self.pending_messages[m_id]
 
-    async def send_and_wait(self, message: str):
-        if self.client is None:
-            return None
+    async def send_and_wait(self, message: str, timeout_value="", timeout=10):
+        global MESSAGES_SENT
         loop = asyncio.get_event_loop()
         task = asyncio.Future()
-        message_id = str(uuid.uuid4())
-        self.pending_messages[message_id] = task, loop
+        message_id = f"{MESSAGES_SENT}"
+        MESSAGES_SENT += 1
+        self.pending_messages[message_id] = task, loop, Timer(timeout, self.cancel_send_and_wait, [
+            message_id, timeout_value])
+        self.pending_messages[message_id][2].start()
         self.socket.sendto(
             f"{message_id}|{message}".encode("utf-8"), self.client)
         result = await task

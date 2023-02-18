@@ -20,21 +20,31 @@ class OsuEnviroment():
 
     def __init__(self) -> None:
         super().__init__()
-        self.agent = OsuAgent()
+        self.stacks = 5
+        self.agent = OsuAgent(self.stacks)
         self.memory = deque([], maxlen=CAPACITY_MAX)
-        self.lr = 0.001
-        self.gamma = 0.7
-        self.model = DQN().to(PYTORCH_DEVICE)
+        self.lr = 1e-4
+        self.gamma = 0.99
+        self.tau = 1.0
+        self.model = DQN(stacks=self.stacks).to(PYTORCH_DEVICE)
+        self.target = DQN(stacks=self.stacks).to(PYTORCH_DEVICE)
+        self.target.load_state_dict(self.model.state_dict())
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss()
         self.epsilon = 0
+        self.plays = 0
 
     def remember(self, mem):
         self.memory.append(mem)
 
     def step(self):
 
-        last_playfield, last_score, last_accuracy, last_game_time = self.agent.get_state()
+        prev_state = self.agent.get_state()
+
+        if prev_state is None:
+            return True
+
+        last_playfield, last_score, last_accuracy, last_game_time = prev_state
 
         action = self.sample(last_playfield)
 
@@ -42,27 +52,33 @@ class OsuEnviroment():
 
         time.sleep(0.05)
 
-        playfield, score, accuracy, game_time = self.agent.get_state()
+        new_state = self.agent.get_state()
+
+        if new_state is None:
+            return True
+
+        playfield, score, accuracy, game_time = new_state
 
         reward = 0
 
-        if score > last_score:
-            reward = 100
-        elif accuracy < last_accuracy:
-            score = -200
+        if accuracy < last_accuracy:
+            if action == 0:
+                reward = -800
+            else:
+                reward = 400
 
-        is_over = accuracy < 5 and game_time > 10
+        is_over = accuracy < 5 and game_time > 2
 
         self.remember(
-            np.array([last_playfield, action, reward, playfield, is_over]))
+            np.array([last_playfield, action, reward, playfield, int(is_over)], dtype=object))
 
         is_over = is_over if not self.train() else True
-
         return is_over
 
     def reset(self):
-        self.epsilon += 1
+        self.plays += 1
         self.agent.reset()
+        print("Attempt", self.plays)
 
     def predict_one(self, img):
         model_in = torch.from_numpy(img)
@@ -80,7 +96,7 @@ class OsuEnviroment():
         return predicated
 
     def sample(self, state):
-        if random.randint(0, 100) > self.epsilon:
+        if random.randint(0, 200) > self.epsilon:
             return random.randint(0, 1)
         else:
             with torch.no_grad():
@@ -93,32 +109,38 @@ class OsuEnviroment():
         states, actions, rewards, next_states, dones = zip(
             *self.memory)
 
-        state = torch.from_numpy(
+        state: torch.Tensor = torch.from_numpy(
             np.stack(states, axis=0)).type(torch.FloatTensor).to(PYTORCH_DEVICE)
-        next_state = torch.from_numpy(
+        next_state: torch.Tensor = torch.from_numpy(
             np.stack(next_states, axis=0)).type(torch.FloatTensor).to(PYTORCH_DEVICE)
-        reward = torch.from_numpy(
+        reward: torch.Tensor = torch.from_numpy(
             np.stack(rewards, axis=0)).type(torch.LongTensor).to(PYTORCH_DEVICE)
-        done = torch.from_numpy(
+        done: torch.Tensor = torch.from_numpy(
             np.stack(dones, axis=0)).to(PYTORCH_DEVICE)
 
-        batch_index = np.arange(CAPACITY_MAX, dtype=np.int32)
-
         action = torch.from_numpy(
-            np.stack(actions, axis=0)).type(torch.LongTensor)
+            np.stack(actions, axis=0)).type(torch.LongTensor).to(PYTORCH_DEVICE)
 
-        q_eval: torch.Tensor = self.model(state)[batch_index, action]
-        q_next: torch.Tensor = self.model(next_state)
-        q_next[done] = 0.0
+        with torch.no_grad():
+            target_max, _ = self.target(next_state).max(dim=1)
+            td_target = reward.flatten() + self.gamma * target_max * (1 - done.flatten())
 
-        q_target = reward + self.gamma * torch.max(q_next, dim=1)[0]
+        old_val = self.model(state).squeeze(1)[action]
 
-        loss = self.criterion(q_target, q_eval).to(PYTORCH_DEVICE)
+        loss = self.criterion(td_target, old_val)
 
+        self.optimizer.zero_grad()
         loss.backward()
-
         self.optimizer.step()
 
         print(f"Optimized with loss {loss.item()}")
+
+        for target_network_param, q_network_param in zip(self.target.parameters(), self.model.parameters()):
+            target_network_param.data.copy_(
+                self.tau * q_network_param.data +
+                (1.0 - self.tau) * target_network_param.data
+            )
+
         self.memory.clear()
+        self.epsilon += 1
         return True

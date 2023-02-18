@@ -27,9 +27,10 @@ def transform_resized(image):
     # normalized = np.stack(
     #     [grayed, grayed, grayed], axis=-1) / 255
 
-    normalized = image / 255
+    # normalized = image / 255
 
-    return image_to_pytorch_image(normalized).numpy()
+    # return image_to_pytorch_image(normalized).numpy()
+    return image / 255
 
 
 def extract_data(area, state: str):
@@ -38,7 +39,7 @@ def extract_data(area, state: str):
     #     f"debug", area)
     # cv2.waitKey(0)
 
-    keys, x, y = state.split(",")
+    key_1, key_2, x, y = state.split(",")
 
     # cv2.imshow(
     #     f"debug", cv2.circle(area, (int((float(x.strip()) -
@@ -52,7 +53,7 @@ def extract_data(area, state: str):
     y = (float(y.strip()) -
          PLAY_AREA_CAPTURE_PARAMS[3]) / PLAY_AREA_CAPTURE_PARAMS[1]
 
-    return [transform_resized(area), KEY_STATES.get(keys.strip(), 0), np.array([x, y])]
+    return [transform_resized(area), KEY_STATES.get(f"{key_1}{key_2}".strip(), 0), np.array([x, y])]
 
 
 class ImageProcessor:
@@ -61,11 +62,9 @@ class ImageProcessor:
 
     def load_images(self, dataset_path, screenshot_ids, load_buttons=False):
         for screenshot_id in screenshot_ids:
-            sct = cv2.imread(
-                path.join(dataset_path, 'display', screenshot_id), cv2.IMREAD_COLOR)
 
-            sct = cv2.resize(sct, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
-                PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), interpolation=cv2.INTER_LINEAR)
+            sct = np.load(path.join(dataset_path, 'display',
+                                    screenshot_id), allow_pickle=True)
 
             f = open(path.join(dataset_path, 'state',
                                screenshot_id[:-3] + "txt"))
@@ -80,7 +79,7 @@ class ImageProcessor:
 
         if extract_actions:  # sort the play area so we can process the input properly
             screenshot_ids.sort(key=lambda x: int(
-                re.search(r"([0-9]+).png", x).groups()[0]))
+                re.search(r"([0-9]+).npy", x).groups()[0]))
 
         processed = []
 

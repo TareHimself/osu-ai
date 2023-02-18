@@ -15,12 +15,19 @@ class DQN(torch.nn.Module):
         torch (_type_): _description_
     """
 
-    def __init__(self):
+    def __init__(self, action_space=1, stacks=4):
         super().__init__()
-        self.conv = resnet18(weights=None)
-        num_ftrs = self.conv.fc.in_features
-        self.conv.fc = nn.Sequential(
-            nn.Linear(num_ftrs, 2)
+        self.conv = nn.Sequential(
+            nn.Conv2d(stacks, 32, 8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, stride=1),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(7488, 512),
+            nn.ReLU(),
+            nn.Linear(512, action_space),
         )
 
     def forward(self, images):

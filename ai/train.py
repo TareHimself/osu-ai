@@ -6,7 +6,7 @@ from ai.dataset import OsuDataset
 import torchvision.transforms as transforms
 from ai.models import ActionsNet, AimNet
 from torch.utils.data import DataLoader
-from utils import get_datasets, get_validated_input, get_models, load_model_data
+from utils import get_datasets, get_model_path, get_validated_input, get_models
 from constants import PYTORCH_DEVICE
 import time
 
@@ -34,8 +34,7 @@ def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=
     model = ActionsNet().type(torch.FloatTensor).to(PYTORCH_DEVICE)
 
     if checkpoint_model:
-        data = load_model_data(checkpoint_model)
-        model.load_state_dict(data['state'])
+        model.load(get_model_path(checkpoint_model))
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -72,21 +71,14 @@ def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=
 
     except KeyboardInterrupt:
         if get_validated_input("Would you like to save the last epoch?\n", lambda a: True, lambda a: a.strip().lower()).startswith("y"):
-            data = {
+            model.save(path.normpath(
+                path.join(save_path, f"model_aim_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")), {
                 'state': last_state_dict
-            }
-
-            torch.save(data, path.normpath(
-                path.join(save_path, f"model_action_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
-
+            })
         return
 
-    data = {
-        'state': model.state_dict()
-    }
-
-    torch.save(data, path.normpath(
-        path.join(save_path, f"model_action_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
+    model.save(path.normpath(
+        path.join(save_path, f"model_aim_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
 
 
 def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=32,
@@ -108,8 +100,7 @@ def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model=None, sav
     model = AimNet().to(PYTORCH_DEVICE)
 
     if checkpoint_model:
-        data = load_model_data(checkpoint_model)
-        model.load_state_dict(data['state'])
+        model.load(get_model_path(checkpoint_model))
 
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -155,20 +146,14 @@ def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model=None, sav
             last_state_dict = model.state_dict()
     except KeyboardInterrupt:
         if get_validated_input("Would you like to save the last epoch?\n", lambda a: True, lambda a: a.strip().lower()).startswith("y"):
-            data = {
+            model.save(path.normpath(
+                path.join(save_path, f"model_aim_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")), {
                 'state': last_state_dict
-            }
-
-            torch.save(data, path.normpath(
-                path.join(save_path, f"model_aim_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
+            })
 
         return
 
-    data = {
-        'state': model.state_dict()
-    }
-
-    torch.save(data, path.normpath(
+    model.save(path.normpath(
         path.join(save_path, f"model_aim_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
 
 
