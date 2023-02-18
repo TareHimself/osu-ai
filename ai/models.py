@@ -33,7 +33,7 @@ class AimNet(OsuAiModel):
     def __init__(self):
         super().__init__()
         # resnet18()
-        self.conv = resnet18(weights=ResNet18_Weights.DEFAULT)
+        self.conv = resnet18(weights=None)
         num_ftrs = self.conv.fc.in_features
         self.conv.fc = nn.Sequential(
             nn.Linear(num_ftrs, 512),

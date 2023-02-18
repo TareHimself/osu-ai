@@ -59,23 +59,28 @@ def extract_data(area, state: str):
 class ImageProcessor:
     def __init__(self) -> None:
         self.buff = Queue()
+        self.state = {}
 
     def load_images(self, dataset_path, screenshot_ids, load_buttons=False):
+        with open(path.join(dataset_path, 'state.txt'), 'r') as st:
+            for line in st.readlines():
+                if len(line.strip()) > 0:
+                    line_id, dat = line.strip().split("|")
+                    self.state[line_id.strip()] = dat.strip()
+
         for screenshot_id in screenshot_ids:
 
-            sct = np.load(path.join(dataset_path, 'display',
+            sct = np.load(path.join(dataset_path, 'frames',
                                     screenshot_id), allow_pickle=True)
 
-            f = open(path.join(dataset_path, 'state',
-                               screenshot_id[:-3] + "txt"))
-            state = f.read()
-            self.buff.put([sct, state])
+            self.buff.put([sct, self.state[screenshot_id[:-4]]])
         self.buff.put(None)
+        self.state = {}
 
     def process_images(self, loader_description, dataset, extract_actions=True):
         dataset_path = path.join(getcwd(), 'data', 'raw', dataset)
 
-        screenshot_ids = listdir(path.join(dataset_path, 'display'))
+        screenshot_ids = listdir(path.join(dataset_path, 'frames'))
 
         if extract_actions:  # sort the play area so we can process the input properly
             screenshot_ids.sort(key=lambda x: int(

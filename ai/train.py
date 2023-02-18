@@ -17,13 +17,13 @@ PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 SAVE_PATH = path.normpath(path.join(getcwd(), 'models'))
 
 
-def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=4,
+def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=32,
                      epochs=1, learning_rate=0.0001, project_name=""):
 
     if len(project_name.strip()) == 0:
         project_name = "-".join(datasets)
 
-    train_set = OsuDataset(datasets=datasets, frame_latency=2)
+    train_set = OsuDataset(datasets=datasets, frame_latency=1)
 
     osu_data_loader = DataLoader(
         train_set,
@@ -72,13 +72,13 @@ def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=
     except KeyboardInterrupt:
         if get_validated_input("Would you like to save the last epoch?\n", lambda a: True, lambda a: a.strip().lower()).startswith("y"):
             model.save(path.normpath(
-                path.join(save_path, f"model_aim_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")), {
+                path.join(save_path, f"model_action_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")), {
                 'state': last_state_dict
             })
         return
 
     model.save(path.normpath(
-        path.join(save_path, f"model_aim_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
+        path.join(save_path, f"model_action_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
 
 
 def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=32,
@@ -171,6 +171,7 @@ def get_train_data(data_type, datasets, datasets_prompt, models, models_prompt):
     selected_datasets = get_validated_input(
         datasets_prompt, validate_datasets_selection, lambda a: map(int, a.strip().split(",")))
     checkpoint = None
+    print('\nConfig for', data_type, '\n')
     epochs = get_validated_input("How many epochs would you like to train for ?\n",
                                  lambda a: a.strip().isnumeric() and 0 <= int(a.strip()), lambda a: int(a.strip()))
 

@@ -1,3 +1,4 @@
+import time
 import torch
 import keyboard
 import win32api
@@ -22,20 +23,23 @@ class EvalThread(Thread):
         self.eval = True
         self.start()
 
-    def load_model(self, path: str) -> OsuAiModel:
+    def get_model(self) -> OsuAiModel:
         pass
 
     def on_output(self, output: Tensor):
         pass
 
     def on_eval_ready(self):
-        pass
+        print("Unknown Model Ready")
 
     def kill(self):
         self.eval = False
 
+    @torch.no_grad()
     def run(self):
-        model = self.load_model(self.model_path)
+        eval_model = self.get_model().to(PYTORCH_DEVICE)
+        eval_model.load(self.model_path)
+        eval_model.eval()
         frame_buffer = deque(maxlen=self.stack_num)
         eval_this_frame = False
 
@@ -47,26 +51,27 @@ class EvalThread(Thread):
 
         cap = WindowCapture(self.game_window_name)
         self.on_eval_ready()
-        with torch.no_grad():
-            while self.eval:
-                frame, stacked = cap.capture(
-                    list(frame_buffer), self.stack_num, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
-                        PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
 
-                frame_buffer.append(frame)
+        while self.eval:
+            frame, stacked = cap.capture(
+                list(frame_buffer), self.stack_num, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+                    PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
 
-                if eval_this_frame:
-                    cv2.imshow("Debug", stacked.transpose(1, 2, 0))
-                    cv2.waitKey(10)
+            frame_buffer.append(frame)
 
-                    converted_frame = torch.from_numpy(stacked / 255).type(
-                        torch.FloatTensor).to(PYTORCH_DEVICE)
+            if eval_this_frame:
+                # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
+                # cv2.waitKey(10)
 
-                    inputs = converted_frame.reshape(
-                        (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
+                converted_frame = torch.from_numpy(stacked / 255).type(
+                    torch.FloatTensor).to(PYTORCH_DEVICE)
 
-                    out = model(inputs)
-                    self.on_output(out)
+                inputs = converted_frame.reshape(
+                    (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
+
+                out: torch.Tensor = eval_model(inputs)
+
+                self.on_output(out.detach())
 
         del cap
 
@@ -81,10 +86,8 @@ class ActionsThread(EvalThread):
     def __init__(self,  model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=3):
         super().__init__(model_path, game_window_name, eval_key, stack_num)
 
-    def load_model(self, path: str) -> OsuAiModel:
-        loaded = ActionsNet().to(PYTORCH_DEVICE)
-        loaded.load(path)
-        return loaded
+    def get_model(self) -> OsuAiModel:
+        return ActionsNet()
 
     def on_eval_ready(self):
         print(f"Actions Model Ready,Press '{self.eval_key}' To Toggle")
@@ -93,7 +96,6 @@ class ActionsThread(EvalThread):
         _, predicated = torch.max(output, dim=1)
         probs = torch.softmax(output, dim=1)
         prob = probs[0][predicated.item()]
-        print("State", predicated.item())
         if prob.item() > 0:  # 0.7:
             state = predicated.item()
             if state == 0:
@@ -111,10 +113,8 @@ class AimThread(EvalThread):
     def __init__(self,  model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=3):
         super().__init__(model_path, game_window_name, eval_key, stack_num)
 
-    def load_model(self, path: str) -> OsuAiModel:
-        loaded = AimNet().to(PYTORCH_DEVICE)
-        loaded.load(path)
-        return loaded
+    def get_model(self) -> OsuAiModel:
+        return AimNet()
 
     def on_eval_ready(self):
         print(f"Aim Model Ready,Press '{self.eval_key}' To Toggle")
