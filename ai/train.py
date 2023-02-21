@@ -17,13 +17,13 @@ PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 SAVE_PATH = path.normpath(path.join(getcwd(), 'models'))
 
 
-def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=16,
-                     epochs=1, learning_rate=0.001, project_name=""):
+def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=64,
+                     epochs=1, learning_rate=0.0003, project_name=""):
 
     if len(project_name.strip()) == 0:
         project_name = "-".join(datasets)
 
-    train_set = OsuDataset(datasets=datasets, frame_latency=0)
+    train_set = OsuDataset(datasets=datasets, frame_latency=2)
 
     osu_data_loader = DataLoader(
         train_set,
@@ -87,7 +87,7 @@ def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model=None, sav
         project_name = "-".join(datasets)
 
     train_set = OsuDataset(datasets=datasets,
-                           frame_latency=0, is_actions=False)
+                           frame_latency=0, label_type=2)
 
     osu_data_loader = DataLoader(
         train_set,

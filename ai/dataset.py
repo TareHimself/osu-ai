@@ -70,7 +70,7 @@ def extract_data(area, state: str):
     return (transform_frame(area), KEY_STATES.get(f"{k1}{k2}".strip(), 0), np.array([x, y]))
 
 
-class ImageProcessor:
+class OsuDatasetCreator:
     def __init__(self) -> None:
         self.work_queue = Queue()
         self.frame_buffer = deque(maxlen=CURRENT_STACK_NUM)
@@ -101,7 +101,7 @@ class ImageProcessor:
             self.work_queue.put(None)
             raise e
 
-    def process_images(self, loader_description, dataset, extract_actions=True):
+    def to_dataset(self, loader_description, dataset, extract_actions=True):
         dataset_path = path.join(getcwd(), 'data', 'raw', dataset)
 
         screenshot_ids = listdir(dataset_path)
@@ -141,7 +141,10 @@ class ImageProcessor:
 
 class OsuDataset(torch.utils.data.Dataset):
 
-    def __init__(self, datasets: list[str], frame_latency=3, is_actions=True, force_rebuild=False) -> None:
+    """
+    label_type = 1 | 2, 1 = actions, 2 = aim
+    """    
+    def __init__(self, datasets: list[str], frame_latency=3, label_type=1, force_rebuild=False) -> None:
         self.datasets = datasets
 
         self.processed_path = path.join(getcwd(
@@ -149,14 +152,13 @@ class OsuDataset(torch.utils.data.Dataset):
         self.images = []
         self.labels = []
         self.frame_latency = frame_latency
-        self.is_actions = is_actions
+        self.label_index = label_type
 
         if not force_rebuild and path.exists(self.processed_path):
             loaded_data = np.load(
                 self.processed_path, allow_pickle=True)
             self.images = list(loaded_data[:, 0])
-            self.labels = list(loaded_data[:, 1]) if is_actions else list(
-                loaded_data[:, 2])
+            self.labels = list(loaded_data[:, self.label_index])
         else:
             self.make_training_data()
 
@@ -170,21 +172,21 @@ class OsuDataset(torch.utils.data.Dataset):
             else:
                 self.labels.pop()
                 self.images.pop(0)
+                
 
     def make_training_data(self):
         global delta_storage
 
         delta_storage = {}
 
-        processor = ImageProcessor()
+        processor = OsuDatasetCreator()
 
         processed_data = None
 
         for i in range(len(self.datasets)):
             dataset = self.datasets[i]
-            new_data = processor.process_images(
-                f"Processing Dataset {dataset} ({i + 1}/{len(self.datasets)})", dataset, self.is_actions)
-            print(new_data.shape)
+            new_data = processor.to_dataset(
+                f"Processing Dataset {dataset} ({i + 1}/{len(self.datasets)})", dataset, self.label_index)
             if processed_data is not None:
                 processed_data = np.concatenate([processed_data, new_data])
             else:
@@ -197,7 +199,7 @@ class OsuDataset(torch.utils.data.Dataset):
 
         self.images = list(processed_data[:, 0])
 
-        self.labels = list(processed_data[:, 1]) if self.is_actions else list(
+        self.labels = list(processed_data[:, 1]) if self.label_index else list(
             processed_data[:, 2])
 
     def __getitem__(self, idx):

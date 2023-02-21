@@ -21,11 +21,6 @@ FINAL_RESIZE_PERCENT = 0.1
 FINAL_PLAY_AREA_SIZE = (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
     PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT))
 
-cursor_mat = cv2.imread(path.normpath(
-    path.join(ASSETS_DIR, 'cursor.png')), cv2.IMREAD_COLOR)
-# cv2.imshow("debug", mask_mat * cursor_mat)
-# cv2.waitKey(0)
-
 PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 CURRENT_STACK_NUM = 3
