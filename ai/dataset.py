@@ -7,8 +7,8 @@ import torchvision.transforms as transforms
 from queue import Queue
 from threading import Thread
 from tqdm import tqdm
-from constants import PLAY_AREA_CAPTURE_PARAMS, GAME_CURSOR, BUTTON_CLICKED_COLOR, BUTTON_CAPTURE_WIDTH, BUTTON_CAPTURE_HEIGHT, FINAL_RESIZE_PERCENT, PLAY_AREA_WIDTH_HEIGHT
-
+from constants import CURRENT_STACK_NUM, FINAL_PLAY_AREA_SIZE, PLAY_AREA_CAPTURE_PARAMS
+from collections import deque
 image_to_pytorch_image = transforms.ToTensor()
 
 INVALID_KEY_STATE = "An Invalid State"
@@ -20,7 +20,21 @@ KEY_STATES = {
 }
 
 
-def transform_resized(image):
+def transform_frame(frame):
+    # crop to play area
+    frame = frame[PLAY_AREA_CAPTURE_PARAMS[3]:PLAY_AREA_CAPTURE_PARAMS[3] + PLAY_AREA_CAPTURE_PARAMS[1],
+                  PLAY_AREA_CAPTURE_PARAMS[2]:PLAY_AREA_CAPTURE_PARAMS[2] + PLAY_AREA_CAPTURE_PARAMS[0]]
+
+    # resize
+    frame = cv2.resize(frame, FINAL_PLAY_AREA_SIZE,
+                       interpolation=cv2.INTER_CUBIC)
+
+    # greyscale
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # normalize
+    frame = frame / 255
+
     # grayed = cv2.cvtColor(
     #     image, cv2.COLOR_BGR2GRAY)
 
@@ -30,7 +44,7 @@ def transform_resized(image):
     # normalized = image / 255
 
     # return image_to_pytorch_image(normalized).numpy()
-    return image / 255
+    return frame
 
 
 def extract_data(area, state: str):
@@ -39,7 +53,7 @@ def extract_data(area, state: str):
     #     f"debug", area)
     # cv2.waitKey(0)
 
-    key_1, key_2, x, y = state.split(",")
+    _, k1, k2, x, y = state.split("-")[1].split(',')
 
     # cv2.imshow(
     #     f"debug", cv2.circle(area, (int((float(x.strip()) -
@@ -53,64 +67,76 @@ def extract_data(area, state: str):
     y = (float(y.strip()) -
          PLAY_AREA_CAPTURE_PARAMS[3]) / PLAY_AREA_CAPTURE_PARAMS[1]
 
-    return [transform_resized(area), KEY_STATES.get(f"{key_1}{key_2}".strip(), 0), np.array([x, y])]
+    return (transform_frame(area), KEY_STATES.get(f"{k1}{k2}".strip(), 0), np.array([x, y]))
 
 
 class ImageProcessor:
     def __init__(self) -> None:
-        self.buff = Queue()
-        self.state = {}
+        self.work_queue = Queue()
+        self.frame_buffer = deque(maxlen=CURRENT_STACK_NUM)
 
-    def load_images(self, dataset_path, screenshot_ids, load_buttons=False):
-        with open(path.join(dataset_path, 'state.txt'), 'r') as st:
-            for line in st.readlines():
-                if len(line.strip()) > 0:
-                    line_id, dat = line.strip().split("|")
-                    self.state[line_id.strip()] = dat.strip()
+    def get_stacked(self, frame):
+        prev_frames = list(self.frame_buffer)
+        prev_count = len(prev_frames)
+        needed_count = CURRENT_STACK_NUM - prev_count
+        final_frames = []
 
-        for screenshot_id in screenshot_ids:
+        if needed_count > 1:
+            final_frames = prev_frames + [frame for _ in range(needed_count)]
+        else:
+            final_frames = prev_frames[prev_count -
+                                       (CURRENT_STACK_NUM - 1):prev_count] + [frame]
+        self.frame_buffer.append(frame)
 
-            sct = np.load(path.join(dataset_path, 'frames',
-                                    screenshot_id), allow_pickle=True)
+        return np.stack(final_frames)
 
-            self.buff.put([sct, self.state[screenshot_id[:-4]]])
-        self.buff.put(None)
-        self.state = {}
+    def load_images_in_background(self, dataset_path, screenshot_ids, load_buttons=False):
+        try:
+            for screenshot_id in screenshot_ids:
+                self.work_queue.put((cv2.imread(
+                    path.join(dataset_path, screenshot_id), cv2.IMREAD_COLOR), screenshot_id[:-4]))
+
+            self.work_queue.put(None)
+        except Exception as e:
+            self.work_queue.put(None)
+            raise e
 
     def process_images(self, loader_description, dataset, extract_actions=True):
         dataset_path = path.join(getcwd(), 'data', 'raw', dataset)
 
-        screenshot_ids = listdir(path.join(dataset_path, 'frames'))
-
-        if extract_actions:  # sort the play area so we can process the input properly
-            screenshot_ids.sort(key=lambda x: int(
-                re.search(r"([0-9]+).npy", x).groups()[0]))
-
+        screenshot_ids = listdir(dataset_path)
+        REXEXP = r"[a-z]+-([0-9]+),[0-1],[0-1],[0-9]+,[0-9]+.png"
+        screenshot_ids.sort(key=lambda x: int(
+            re.search(REXEXP, x).groups()[0]))
         processed = []
 
         loading_bar = tqdm(total=len(screenshot_ids),
                            desc=loader_description)
 
-        Thread(target=self.load_images, daemon=True, group=None,
+        Thread(target=self.load_images_in_background, daemon=True, group=None,
                kwargs={"dataset_path": dataset_path, "screenshot_ids": screenshot_ids}).start()  # load the images in a seperate thread
 
-        data = self.buff.get()  # get an image or none if we are done
+        data = self.work_queue.get()  # get an image or none if we are done
         while data is not None:
             sct, state = data
 
-            result = None
+            frame, key_dat, aim_dat = extract_data(sct, state)
 
-            result = extract_data(sct, state)
+            stacked = self.get_stacked(frame)
 
-            if result is not None:
-                processed.append(result)
+            # cv2.imshow(f"debug", stacked.transpose((1, 2, 0)))
+            # cv2.waitKey(10)
+
+            processed.append(
+                np.array([stacked, key_dat, aim_dat], dtype=object))
 
             # update the progress bar
             loading_bar.update()
 
-            data = self.buff.get()
+            data = self.work_queue.get()
         loading_bar.close()
-        return np.array(processed, dtype=object)
+        self.frame_buffer.clear()
+        return np.stack(processed)
 
 
 class OsuDataset(torch.utils.data.Dataset):
@@ -152,12 +178,20 @@ class OsuDataset(torch.utils.data.Dataset):
 
         processor = ImageProcessor()
 
-        processed_data = np.empty((0, 3))
+        processed_data = None
 
         for i in range(len(self.datasets)):
             dataset = self.datasets[i]
-            processed_data = np.concatenate(
-                [processed_data, processor.process_images(f"Processing Dataset {dataset} ({i + 1}/{len(self.datasets)})", dataset, self.is_actions)])
+            new_data = processor.process_images(
+                f"Processing Dataset {dataset} ({i + 1}/{len(self.datasets)})", dataset, self.is_actions)
+            print(new_data.shape)
+            if processed_data is not None:
+                processed_data = np.concatenate([processed_data, new_data])
+            else:
+                processed_data = new_data
+
+        if processed_data is None:
+            raise Exception("No data was processed")
 
         np.save(self.processed_path, processed_data)
 

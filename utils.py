@@ -11,6 +11,38 @@ from constants import RAW_DATA_DIR
 import torch
 from queue import Queue
 
+"""
+    Ensures this context runs for the given fixed time or more
+
+    Returns:
+        _type_: _description_
+
+    """
+
+
+class FixedRuntime():
+    def __init__(self, target_time=1, debug=None):
+        self.start = 0
+        self.delay = target_time
+        self.debug = debug
+
+    def __enter__(self):
+        self.start = time.time()
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        elapsed = time.time() - self.start
+        wait_time = self.delay - elapsed
+        if wait_time > 0:
+            time.sleep(wait_time)
+            if self.debug is not None:
+                print(f"Context [{self.debug}] Delayed for {wait_time:.4f}s")
+        else:
+            if self.debug is not None:
+                print(
+                    f"Context [{self.debug}] Took {(wait_time * -1):.4f}s longer")
+
+
 MESSAGES_SENT = 0
 
 

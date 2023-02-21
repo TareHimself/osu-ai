@@ -17,13 +17,13 @@ PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 SAVE_PATH = path.normpath(path.join(getcwd(), 'models'))
 
 
-def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=32,
-                     epochs=1, learning_rate=0.0001, project_name=""):
+def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=16,
+                     epochs=1, learning_rate=0.001, project_name=""):
 
     if len(project_name.strip()) == 0:
         project_name = "-".join(datasets)
 
-    train_set = OsuDataset(datasets=datasets, frame_latency=1)
+    train_set = OsuDataset(datasets=datasets, frame_latency=0)
 
     osu_data_loader = DataLoader(
         train_set,
@@ -81,7 +81,7 @@ def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model=
         path.join(save_path, f"model_action_{project_name}_{time.strftime('%d-%m-%y-%H-%M-%S')}.pt")))
 
 
-def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=32,
+def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model=None, save_path=SAVE_PATH, batch_size=64,
                   epochs=1, learning_rate=0.0003, project_name=""):
     if len(project_name.strip()) == 0:
         project_name = "-".join(datasets)

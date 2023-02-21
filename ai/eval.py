@@ -6,7 +6,8 @@ from threading import Thread
 from torch.nn import Module
 from torch import Tensor
 from ai.models import ActionsNet, AimNet, OsuAiModel
-from constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
+from constants import CURRENT_STACK_NUM, FINAL_RESIZE_PERCENT, FRAME_DELAY, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
+from utils import FixedRuntime
 from windows import WindowCapture
 from collections import deque
 import cv2
@@ -14,7 +15,7 @@ import cv2
 
 class EvalThread(Thread):
 
-    def __init__(self, model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=3):
+    def __init__(self, model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=CURRENT_STACK_NUM):
         super().__init__(group=None, daemon=True)
         self.game_window_name = game_window_name
         self.model_path = model_path
@@ -53,25 +54,27 @@ class EvalThread(Thread):
         self.on_eval_ready()
 
         while self.eval:
-            frame, stacked = cap.capture(
-                list(frame_buffer), self.stack_num, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
-                    PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
+            with FixedRuntime(target_time=FRAME_DELAY):
 
-            frame_buffer.append(frame)
+                frame, stacked = cap.capture(
+                    list(frame_buffer), self.stack_num, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+                        PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
 
-            if eval_this_frame:
-                # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
-                # cv2.waitKey(10)
+                frame_buffer.append(frame)
 
-                converted_frame = torch.from_numpy(stacked / 255).type(
-                    torch.FloatTensor).to(PYTORCH_DEVICE)
+                if eval_this_frame:
+                    # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
+                    # cv2.waitKey(10)
 
-                inputs = converted_frame.reshape(
-                    (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
+                    converted_frame = torch.from_numpy(stacked / 255).type(
+                        torch.FloatTensor).to(PYTORCH_DEVICE)
 
-                out: torch.Tensor = eval_model(inputs)
+                    inputs = converted_frame.reshape(
+                        (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
 
-                self.on_output(out.detach())
+                    out: torch.Tensor = eval_model(inputs)
+
+                    self.on_output(out.detach())
 
         del cap
 
@@ -83,7 +86,7 @@ class ActionsThread(EvalThread):
         2: "Button 2"
     }
 
-    def __init__(self,  model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=3):
+    def __init__(self,  model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=CURRENT_STACK_NUM):
         super().__init__(model_path, game_window_name, eval_key, stack_num)
 
     def get_model(self) -> OsuAiModel:
@@ -110,7 +113,7 @@ class ActionsThread(EvalThread):
 
 
 class AimThread(EvalThread):
-    def __init__(self,  model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=3):
+    def __init__(self,  model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=CURRENT_STACK_NUM):
         super().__init__(model_path, game_window_name, eval_key, stack_num)
 
     def get_model(self) -> OsuAiModel:

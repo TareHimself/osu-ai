@@ -5,10 +5,10 @@ import cv2
 import numpy as np
 import torch
 from collections import deque
-from utils import get_models, get_validated_input, get_model_path
+from utils import FixedRuntime, get_models, get_validated_input, get_model_path
 import torchvision.transforms as transforms
 from ai.models import ActionsNet, AimNet
-from constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
+from constants import CURRENT_STACK_NUM, FINAL_PLAY_AREA_SIZE, FINAL_RESIZE_PERCENT, FRAME_DELAY, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
 import win32api
 
 transform = transforms.ToTensor()
@@ -99,53 +99,55 @@ def start_play(time_between_frames=0):
                 action_models[action_model_index]))
             actions_model.eval()
 
-        FRAME_BUFF_MAX = 3
+        FRAME_BUFF_MAX = CURRENT_STACK_NUM
 
         FRAME_BUFF = deque(maxlen=FRAME_BUFF_MAX)
+
+        print("FRAME BUFF", FRAME_BUFF_MAX)
 
         print("Configuration Ready,Press '\\' To Toggle the model(s)")
         fps = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         try:
             while True:
-                start = time.time()
-                debug = f"FPS {sum(fps) / len(fps):.4f} "
-                frame, stacked = window_capture.capture(
-                    list(FRAME_BUFF), FRAME_BUFF_MAX, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
-                        PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
+                with FixedRuntime(target_time=FRAME_DELAY):
+                    start = time.time()
+                    debug = f"FPS {sum(fps) / len(fps):.4f} "
+                    frame, stacked = window_capture.capture(
+                        list(FRAME_BUFF), FRAME_BUFF_MAX, FINAL_PLAY_AREA_SIZE, *PLAY_AREA_CAPTURE_PARAMS)
 
-                FRAME_BUFF.append(frame)
+                    FRAME_BUFF.append(frame)
 
-                if do_prediction:
-                    stacked = stacked / 255
+                    if do_prediction:
+                        stacked = stacked / 255
 
-                    converted_frame = torch.from_numpy(stacked).type(
-                        torch.FloatTensor).to(PYTORCH_DEVICE)
+                        converted_frame = torch.from_numpy(stacked).type(
+                            torch.FloatTensor).to(PYTORCH_DEVICE)
 
-                    inputs = converted_frame.reshape(
-                        (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
+                        inputs = converted_frame.reshape(
+                            (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
 
-                    if aim_model:
-                        output = aim_model(inputs)
-                        mouse_x_percent, mouse_y_percent = output[0]
-                        position = (int((mouse_x_percent * PLAY_AREA_CAPTURE_PARAMS[0]) + PLAY_AREA_CAPTURE_PARAMS[2]), int(
-                            (mouse_y_percent * PLAY_AREA_CAPTURE_PARAMS[1]) + PLAY_AREA_CAPTURE_PARAMS[3]))
-                        win32api.SetCursorPos(position)
-                        debug += f"Cursor Position {position}        "
+                        if aim_model:
+                            output = aim_model(inputs)
+                            mouse_x_percent, mouse_y_percent = output[0]
+                            position = (int((mouse_x_percent * PLAY_AREA_CAPTURE_PARAMS[0]) + PLAY_AREA_CAPTURE_PARAMS[2]), int(
+                                (mouse_y_percent * PLAY_AREA_CAPTURE_PARAMS[1]) + PLAY_AREA_CAPTURE_PARAMS[3]))
+                            win32api.SetCursorPos(position)
+                            debug += f"Cursor Position {position}        "
 
-                    if actions_model:
-                        output = actions_model(inputs)
-                        _, predicated = torch.max(output, dim=1)
+                        if actions_model:
+                            output = actions_model(inputs)
+                            _, predicated = torch.max(output, dim=1)
 
-                        probs = torch.softmax(output, dim=1)
-                        prob = probs[0][predicated.item()]
-                        debug += f"Decision {KEYS_STATE_TO_STRING[predicated.item()]} :: chance {prob.item():.2f}       "
+                            probs = torch.softmax(output, dim=1)
+                            prob = probs[0][predicated.item()]
+                            debug += f"Decision {KEYS_STATE_TO_STRING[predicated.item()]} :: chance {prob.item():.2f}       "
 
-                        if prob.item() > 0:  # 0.7:
-                            set_key_state(predicated.item())
+                            if prob.item() > 0:  # 0.7:
+                                set_key_state(predicated.item())
 
-                fps.append(1 / (time.time() - start))
-                fps.pop(0)
-                print(debug, end='\r')
+                    fps.append(1 / (time.time() - start))
+                    fps.pop(0)
+                    print(debug, end='\r')
         except KeyboardInterrupt as e:
             pass
     except Exception as e:
