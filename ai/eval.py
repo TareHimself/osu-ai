@@ -15,7 +15,7 @@ import cv2
 
 class EvalThread(Thread):
 
-    def __init__(self, model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=CURRENT_STACK_NUM):
+    def __init__(self, model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=CURRENT_STACK_NUM,):
         super().__init__(group=None, daemon=True)
         self.game_window_name = game_window_name
         self.model_path = model_path
