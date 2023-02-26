@@ -143,7 +143,8 @@ class OsuDataset(torch.utils.data.Dataset):
 
     """
     label_type = 1 | 2, 1 = actions, 2 = aim
-    """    
+    """
+
     def __init__(self, datasets: list[str], frame_latency=3, label_type=1, force_rebuild=False) -> None:
         self.datasets = datasets
 
@@ -172,7 +173,6 @@ class OsuDataset(torch.utils.data.Dataset):
             else:
                 self.labels.pop()
                 self.images.pop(0)
-                
 
     def make_training_data(self):
         global delta_storage
@@ -199,8 +199,7 @@ class OsuDataset(torch.utils.data.Dataset):
 
         self.images = list(processed_data[:, 0])
 
-        self.labels = list(processed_data[:, 1]) if self.label_index else list(
-            processed_data[:, 2])
+        self.labels = list(processed_data[:, self.label_index])
 
     def __getitem__(self, idx):
         return self.images[idx], self.labels[idx]

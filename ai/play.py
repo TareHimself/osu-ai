@@ -59,8 +59,9 @@ def start_play(time_between_frames=0):
                 model_path=get_model_path(action_models[action_model_index]))
 
         try:
-            with FixedRuntime(0.01):
-                pass
+            while True:
+                with FixedRuntime(0.01):
+                    pass
 
         except KeyboardInterrupt as e:
             if actions_model is not None:
