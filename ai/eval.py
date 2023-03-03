@@ -12,10 +12,12 @@ from windows import WindowCapture
 from collections import deque
 import cv2
 
+DEFAULT_OSU_WINDOW = "osu! (development)"
+
 
 class EvalThread(Thread):
 
-    def __init__(self, model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=CURRENT_STACK_NUM,):
+    def __init__(self, model_path: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\', stack_num=CURRENT_STACK_NUM,):
         super().__init__(group=None, daemon=True)
         self.game_window_name = game_window_name
         self.model_path = model_path
@@ -86,7 +88,7 @@ class ActionsThread(EvalThread):
         2: "Button 2"
     }
 
-    def __init__(self,  model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=CURRENT_STACK_NUM):
+    def __init__(self,  model_path: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\', stack_num=CURRENT_STACK_NUM):
         super().__init__(model_path, game_window_name, eval_key, stack_num)
 
     def get_model(self) -> OsuAiModel:
@@ -113,7 +115,7 @@ class ActionsThread(EvalThread):
 
 
 class AimThread(EvalThread):
-    def __init__(self,  model_path: str, game_window_name: str = "osu! (development)", eval_key: str = '\\', stack_num=CURRENT_STACK_NUM):
+    def __init__(self,  model_path: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\', stack_num=CURRENT_STACK_NUM):
         super().__init__(model_path, game_window_name, eval_key, stack_num)
 
     def get_model(self) -> OsuAiModel:
