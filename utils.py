@@ -2,14 +2,17 @@ import asyncio
 from os import listdir, path, getcwd
 import os
 import socket
-from threading import Thread, Timer
+from threading import Thread, Timer, Event
 import time
 import traceback
 from typing import Callable
 import uuid
 from constants import RAW_DATA_DIR
 import torch
+import cv2
 from queue import Queue
+
+from windows import WindowCapture
 
 """
     Ensures this context runs for the given fixed time or more
@@ -36,11 +39,10 @@ class FixedRuntime():
         if wait_time > 0:
             time.sleep(wait_time)
             if self.debug is not None:
-                print(f"Context [{self.debug}] Delayed for {wait_time:.4f}s")
+                print(f"Context [{self.debug}] elapsed {wait_time * -1:.4f}s")
         else:
             if self.debug is not None:
-                print(
-                    f"Context [{self.debug}] Took {(wait_time * -1):.4f}s longer")
+                print(f"Context [{self.debug}] elapsed {wait_time * -1:.4f}s")
 
 
 MESSAGES_SENT = 0
@@ -111,13 +113,22 @@ class FileWatcher(Thread):
 class OsuSocketServer:
     def __init__(self, on_state_updated) -> None:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.bind(("127.0.0.1", 9200))
-        self.client = ("127.0.0.1", 9500)
         self.on_state_updated = on_state_updated
         self.pending_messages = {}
         self.active = True
+
+    def connect(self):
+        self.socket.bind(("127.0.0.1", 9200))
+        self.client = ("127.0.0.1", 9500)
         self.t1 = Thread(group=None, target=self.recieve_messages, daemon=True)
         self.t1.start()
+
+    def __enter__(self):
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.kill()
 
     def on_message_internal(self, message):
         message_id, content = message.split('|')
@@ -167,4 +178,57 @@ class OsuSocketServer:
         return result
 
     def kill(self):
-        self.socket.settimeout(1)
+        if not self.active:
+            self.socket.settimeout(1)
+            self.socket.close()
+        self.active = True
+
+
+class RecorderThread(Thread):
+    def __init__(self, rate: int):
+        super().__init__(group=None, daemon=True)
+        self.rate = rate
+        self.stop_event = Event()
+        self.start()
+
+    def stop(self):
+        self.stop_event.set()
+
+    def run(self):
+        print(self.rate, 1/self.rate)
+        source = cv2.VideoWriter_fourcc(*"XVID")
+        cap = WindowCapture()
+        writer = cv2.VideoWriter(
+            f"{int(time.time() * 1000)}.avi", source, self.rate, (1920, 1080))
+
+        while True:
+            with FixedRuntime(1 / self.rate, 'Screen'):
+                writer.write(cap.capture())
+                if self.stop_event.is_set():
+                    break
+
+        writer.release()
+
+
+class ScreenRecorder():
+    def __init__(self, rate: int = 30):
+        self.rate = rate
+        self.thread = None
+
+    def start(self):
+        if self.thread is not None:
+            self.thread.stop()
+
+        self.thread = RecorderThread(rate=self.rate)
+
+    def stop(self):
+        if self.thread is not None:
+            self.thread.stop()
+            self.thread = None
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.stop()

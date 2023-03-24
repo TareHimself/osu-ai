@@ -1,0 +1,10 @@
+gymnasium==0.28.0
+keyboard==0.13.5
+numpy==1.23.5
+opencv_python==4.7.0.72
+pygame==2.3.0
+pywin32==228
+torch==1.13.1
+torchvision==0.14.1
+tqdm==4.64.1
+win32gui==221.6

@@ -71,6 +71,7 @@ class AimNet(OsuAiModel):
         self.conv.conv1 = nn.Conv2d(
             CURRENT_STACK_NUM, 64, kernel_size=7, stride=2, padding=3, bias=False)
         num_ftrs = self.conv.fc.in_features
+        print("FEATURES",num_ftrs)
         self.conv.fc = nn.Sequential(
             nn.Linear(num_ftrs, 512),
             nn.ReLU(),

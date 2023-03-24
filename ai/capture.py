@@ -1,19 +1,22 @@
 import asyncio
 from datetime import datetime
 import os
+import uuid
 import shutil
 from typing import Union
-from os import path, mkdir, getcwd, makedirs
-import time
+from os import path, mkdir, getcwd, makedirs, listdir
+from tqdm import tqdm
 import keyboard
-import cv2
+import zipfile
 from collections import deque
 import numpy as np
 from threading import Thread
 from queue import Queue
 from windows import WindowCapture
-from utils import FileWatcher, FixedRuntime, OsuSocketServer, get_validated_input
+from utils import FileWatcher, FixedRuntime, OsuSocketServer, ScreenRecorder, get_validated_input
 from constants import CURRENT_STACK_NUM, FINAL_RESIZE_PERCENT, FRAME_DELAY, PLAY_AREA_CAPTURE_PARAMS
+from tempfile import TemporaryDirectory
+
 
 # list_window_names()
 
@@ -26,57 +29,55 @@ def start_capture():
     global FRAMES_PROCESSED
     global PROJECT_NAME
     global PROJECT_PATH
+    with TemporaryDirectory() as CAPTURE_DIR:
+        with OsuSocketServer(on_state_updated=lambda a: a) as osu_client:
+            capture_frame = False
 
-    FRAMES_PROCESSED = 0
-    FRAMES_TOTAL = 0
+            PROJECT_NAME = get_validated_input(
+                'What Would You Like To Name This Project ?:', conversion_fn=lambda a: a.lower().strip())
 
-    capture_frame = False
+            PROJECT_PATH = path.join(
+                getcwd(), 'data', 'raw', f"{PROJECT_NAME}.zip")
 
-    PROJECT_NAME = get_validated_input(
-        'What Would You Like To Name This Project ?:', conversion_fn=lambda a: a.lower().strip())
+            def toggle_capture():
+                nonlocal osu_client
+                nonlocal capture_frame
+                nonlocal CAPTURE_DIR
+                global PROJECT_NAME
 
-    PROJECT_PATH = path.join(getcwd(), 'data', 'raw', PROJECT_NAME)
+                if osu_client is None or not osu_client.active:
+                    return
 
-    if path.exists(PROJECT_PATH):
-        shutil.rmtree(PROJECT_PATH)
-    makedirs(PROJECT_PATH)
+                capture_frame = not capture_frame
+                if capture_frame:
+                    osu_client.send(
+                        f'save,{PROJECT_NAME},start,0.01,{CAPTURE_DIR}')
+                    print(f'Capturing Frames')
+                else:
+                    osu_client.send(f'save,{PROJECT_NAME},stop,0.01, ')
+                    print(f'Stopped Capturing Frames')
 
-    socket_server = OsuSocketServer(on_state_updated=lambda a: a)
+            keyboard.add_hotkey('\\', callback=toggle_capture)
 
-    def toggle_capture():
-        nonlocal socket_server
-        nonlocal capture_frame
-        global PROJECT_NAME
-        capture_frame = not capture_frame
-        if capture_frame:
-            socket_server.send(f'save,{PROJECT_NAME},start,0.01')
-            print(f'Capturing Frames')
-        else:
-            socket_server.send(f'save,{PROJECT_NAME},stop,0.01')
-            print(f'Stopped Capturing Frames')
-
-    keyboard.add_hotkey('\\', callback=toggle_capture)
-
-    try:
-
-        try:
-            print("Ready To Capture Frames")
-            while True:
-                with FixedRuntime(target_time=10):
-                    pass
-        except KeyboardInterrupt as e:
-            socket_server.send(f'save,{PROJECT_NAME},stop,0.01')
             try:
-                PENDING_CAPTURE_PATH = path.join(getcwd(), "pending-capture")
-                for file in os.listdir(PENDING_CAPTURE_PATH):
-                    if file.split('-')[0].strip() == PROJECT_NAME:
-                        os.rename(path.join(PENDING_CAPTURE_PATH, file),
-                                  path.join(PROJECT_PATH, file))
-            except Exception as e:
-                print("Error moving capture data", e)
 
-            socket_server.kill()
-    except Exception as e:
-        socket_server.send(f'save,{PROJECT_NAME},stop,0.01')
-        socket_server.kill()
-        print(e)
+                try:
+                    print(
+                        "Ready To Capture Frames, use the \"\\\" Key to toggle capture")
+                    while True:
+                        with FixedRuntime(target_time=10):
+                            pass
+                except KeyboardInterrupt as e:
+                    osu_client.send(f'save,{PROJECT_NAME},stop,0.01, ')
+
+                    with zipfile.ZipFile(PROJECT_PATH, "w", zipfile.ZIP_DEFLATED) as zip:
+                        temp_files = listdir(CAPTURE_DIR)
+
+                        for file in tqdm(temp_files, desc="Zipping up captured images"):
+
+                            zip.write(os.path.join(CAPTURE_DIR, file), file)
+
+            except Exception as e:
+                osu_client.send(f'save,{PROJECT_NAME},stop,0.01, ')
+
+                print(e)

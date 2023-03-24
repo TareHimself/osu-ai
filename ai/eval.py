@@ -11,7 +11,7 @@ from utils import FixedRuntime
 from windows import WindowCapture
 from collections import deque
 import cv2
-
+#'osu!'  #
 DEFAULT_OSU_WINDOW = "osu! (development)"
 
 

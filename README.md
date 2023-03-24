@@ -1,18 +1,33 @@
-# Osu Neural Network Created Using Pytorch  
-- DISCLAIMER : I am not responsible for any consequences that stem from the illicit use of the contents of this repository.  
+# Osu Neural Network Created Using Pytorch
+
+- DISCLAIMER : I am not responsible for any consequences that stem from the illicit use of the contents of this repository.
+
 ## Info
-- Original skin by [okami187](https://osu.ppy.sh/users/15566410).
-  
-- screenshots are collected from "Autoplay" and required info is extracted during dataset creation.
 
-- The model is currently only capable of clicking.
+- Data is mainly gotten from autoplay but should also work on replays.
 
-- The skin the model currently uses is [here](/Oka_Custom.osk).
+- There are two seperate models, one for clicking and one for aiming.
 
-- Showcase video [here](https://www.youtube.com/watch?v=ZgHyN98iR1M&t=5s).
+- All skins used are located in [assets/skins](assets/skins)
 
-## Example Autopilot play below on [this map](https://osu.ppy.sh/beatmapsets/765778#osu/1627148).  The model was trained using [this map](https://osu.ppy.sh/beatmapsets/1721048#osu/3560542).
+- Showcase videos [Clicking](https://www.youtube.com/watch?v=ZgHyN98iR1M&t=5s) and [Aiming](https://www.youtube.com/watch?v=YEoSrtow8Qw).
+
+- This repo only works on windows due to how screenshots are taken during testing.
+
+## Quick Start
+
+- The following assume that your monitor/screen size is 1920x1080 (plan to make it dynamic later)
+- Clone this repository and also these forked repositories [osu-framework](https://github.com/TareHimself/osu-framework) and [osu lazer](https://github.com/TareHimself/osu-ml). make sure that osu-framework and osu lazer are in the same directory
+- Open up the cloned osu lazer repo and replace the first line in "config.txt" with the path to your cloned version of this repo.
+- Open up this repo and install the requirements along with the [wheel](assets/pywin32-228-cp39-cp39-win_amd64.whl).
+- Run osu by navigating to the cloned osu lazer repo and running "dotnet run --project osu.Desktop". (You must have DotNet installed for osu to work)
+- Run main.py and follow the steps depending on what you want to do.
+- You do not need osu lazer open to train but you need it to test and to collect data.
+
+## Example Autopilot play below on [this map](https://osu.ppy.sh/beatmapsets/765778#osu/1627148). The model was trained using [this map](https://osu.ppy.sh/beatmapsets/1721048#osu/3560542).
+
 ![goodplay](assets/good-play-autopilot.png)
 
-## Example Relax play below on [this map](https://osu.ppy.sh/beatmapsets/1357624#osu/2809623).  The model was trained using [this map](https://osu.ppy.sh/beatmapsets/1511778#osu/3287118).
+## Example Relax play below on [this map](https://osu.ppy.sh/beatmapsets/1357624#osu/2809623). The model was trained using [this map](https://osu.ppy.sh/beatmapsets/1511778#osu/3287118).
+
 ![goodplay](assets/good-play-relax.png)
