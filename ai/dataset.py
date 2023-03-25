@@ -165,8 +165,8 @@ class OsuDataset(torch.utils.data.Dataset):
                     frame, state)
 
                 stacked = self.stack_frames(frame_queue, frame)
-                cv2.imshow("Debug", stacked.transpose(1, 2, 0))
-                cv2.waitKey(2)
+                # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
+                # cv2.waitKey(2)
 
                 processed.append(
                     np.array([stacked, key_state, mouse_state], dtype=object))
