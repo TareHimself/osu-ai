@@ -99,13 +99,12 @@ class OsuDataset(torch.utils.data.Dataset):
         prev_count = len(prev_frames)
         needed_count = CURRENT_STACK_NUM - prev_count
         final_frames = []
-
         if needed_count > 1:
             final_frames = prev_frames + [frame for _ in range(needed_count)]
         else:
             final_frames = prev_frames[prev_count -
                                        (CURRENT_STACK_NUM - 1):prev_count] + [frame]
-        prev_frames.append(frame)
+        previous_frames.append(frame)
 
         return np.stack(final_frames)
 
@@ -165,8 +164,12 @@ class OsuDataset(torch.utils.data.Dataset):
                 frame, key_state, mouse_state = self.extract_info(
                     frame, state)
 
+                stacked = self.stack_frames(frame_queue, frame)
+                cv2.imshow("Debug", stacked.transpose(1, 2, 0))
+                cv2.waitKey(2)
+
                 processed.append(
-                    np.array([self.stack_frames(frame_queue, frame), key_state, mouse_state], dtype=object))
+                    np.array([stacked, key_state, mouse_state], dtype=object))
 
                 loader.update()
                 data = self.data_to_process.get()
