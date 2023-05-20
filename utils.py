@@ -2,6 +2,7 @@ import asyncio
 from os import listdir, path, getcwd
 import os
 import socket
+from socket import SHUT_RDWR
 from threading import Thread, Timer, Event
 import time
 import traceback
@@ -115,9 +116,9 @@ class OsuSocketServer:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.on_state_updated = on_state_updated
         self.pending_messages = {}
-        self.active = True
 
     def connect(self):
+        self.active = True
         self.socket.bind(("127.0.0.1", 9200))
         self.client = ("127.0.0.1", 9500)
         self.t1 = Thread(group=None, target=self.recieve_messages, daemon=True)
@@ -145,13 +146,12 @@ class OsuSocketServer:
     def recieve_messages(self):
         while True:
             try:
-                message, address = self.socket.recvfrom(1024)
-                message = message.decode("utf-8")
-                self.on_message_internal(message)
+                if self.socket is not None:
+                    message, address = self.socket.recvfrom(1024)
+                    message = message.decode("utf-8")
+                    self.on_message_internal(message)
             except socket.timeout:
                 break
-
-        self.socket.close()
 
     def send(self, message: str):
         self.socket.sendto(
@@ -178,10 +178,13 @@ class OsuSocketServer:
         return result
 
     def kill(self):
-        if not self.active:
-            self.socket.settimeout(1)
-            self.socket.close()
-        self.active = True
+        if self.active:
+            target = self.socket
+            self.socket = None
+            target.settimeout(1)
+            target.shutdown(SHUT_RDWR)
+            target.close()
+        self.active = False
 
 
 class RecorderThread(Thread):

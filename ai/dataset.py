@@ -1,6 +1,6 @@
 import re
 import uuid
-from os import getcwd, listdir, path, makedirs
+from os import getcwd, listdir, path, makedirs, unlink
 import cv2
 import numpy as np
 import torch
@@ -10,8 +10,9 @@ import zipfile
 import torchvision.transforms as transforms
 from queue import Queue
 from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
-from constants import CURRENT_STACK_NUM, FINAL_PLAY_AREA_SIZE, PLAY_AREA_CAPTURE_PARAMS, FINAL_RESIZE_PERCENT
+from constants import CURRENT_STACK_NUM, FINAL_PLAY_AREA_SIZE, PLAY_AREA_CAPTURE_PARAMS, FINAL_RESIZE_PERCENT, PROCESSED_DATA_DIR, RAW_DATA_DIR, MAX_THREADS_FOR_RESIZING
 from collections import deque
 
 
@@ -32,8 +33,6 @@ class OsuDataset(torch.utils.data.Dataset):
 
     """
 
-    PROCESSED_DATA_PATH = path.join(getcwd(), 'data', 'processed')
-    RAW_DATA_PATH = path.join(getcwd(), 'data', 'raw')
     LABEL_TYPE_ACTIONS = 1
     LABEL_TYPE_AIM = 2
     FILE_REXEXP = r"[a-zA-Z0-9\(\)\s]+-([0-9]+),[0-1],[0-1],[0-9]+,[0-9]+.png"
@@ -60,14 +59,6 @@ class OsuDataset(torch.utils.data.Dataset):
                 self.images.pop(0)
 
     def extract_info(self, frame, state):
-        # crop to play area
-        frame = frame[PLAY_AREA_CAPTURE_PARAMS[3]:PLAY_AREA_CAPTURE_PARAMS[3] + PLAY_AREA_CAPTURE_PARAMS[1],
-                      PLAY_AREA_CAPTURE_PARAMS[2]:PLAY_AREA_CAPTURE_PARAMS[2] + PLAY_AREA_CAPTURE_PARAMS[0]]
-
-        # resize
-        frame = cv2.resize(frame, FINAL_PLAY_AREA_SIZE,
-                           interpolation=cv2.INTER_CUBIC)
-
         # greyscale
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -119,28 +110,65 @@ class OsuDataset(torch.utils.data.Dataset):
         except Exception as e:
             print(e, traceback.format_exc())
 
+    def extract_and_resize(self, dataset, source_path):
+        files = []
+        temp_path = self.temp_dir
+        source_zip = zipfile.ZipFile(file=source_path)
+        files_to_load = source_zip.namelist()
+        loading_bar = tqdm(
+            desc=f"Resizing Dataset [{dataset[:-4]}]", total=len(files_to_load))
+
+        def resize_image(filename):
+            nonlocal source_zip
+            nonlocal temp_path
+            try:
+                source_zip.extract(member=filename, path=temp_path)
+
+                current_item_path = path.join(temp_path, filename)
+
+                frame = cv2.imread(current_item_path, cv2.IMREAD_COLOR)
+
+                # crop to play area
+                frame = frame[PLAY_AREA_CAPTURE_PARAMS[3]:PLAY_AREA_CAPTURE_PARAMS[3] + PLAY_AREA_CAPTURE_PARAMS[1],
+                              PLAY_AREA_CAPTURE_PARAMS[2]:PLAY_AREA_CAPTURE_PARAMS[2] + PLAY_AREA_CAPTURE_PARAMS[0]]
+
+                # resize
+                frame = cv2.resize(
+                    frame, FINAL_PLAY_AREA_SIZE, interpolation=cv2.INTER_LINEAR)
+
+                cv2.imwrite(current_item_path, frame)
+                files.append(filename)
+                loading_bar.update()
+
+            except Exception as e:
+                print(e, traceback.format_exc())
+
+        try:
+            with ThreadPoolExecutor(MAX_THREADS_FOR_RESIZING) as exec:
+                for file in files_to_load:
+                    exec.submit(resize_image, file)
+                exec.shutdown()
+
+        except KeyboardInterrupt as e:
+            pass
+
+        return files
+
     def get_or_create_dataset(self, temp_dir, dataset: str):
 
         try:
 
             processed_data_path = path.join(
-                OsuDataset.PROCESSED_DATA_PATH, f"{CURRENT_STACK_NUM}-{FINAL_RESIZE_PERCENT}-{dataset}.npy")
+                PROCESSED_DATA_DIR, f"{CURRENT_STACK_NUM}-{FINAL_RESIZE_PERCENT}-{dataset[:-4]}.npy")
             raw_data_path = path.join(
-                OsuDataset.RAW_DATA_PATH, f'{dataset}')
+                RAW_DATA_DIR, f'{dataset}')
 
             if not self.force_rebuild and path.exists(processed_data_path):
                 loaded_data = np.load(processed_data_path, allow_pickle=True)
                 return list(loaded_data[:, 0]), list(loaded_data[:, self.label_index])
 
-            files = []
-
-            with zipfile.ZipFile(file=raw_data_path) as zip_file:
-                # Loop over each file
-                for data in tqdm(zip_file.namelist(), desc=f"Extracting Dataset [{dataset[:-4]}]"):
-                    # Extract each file to another directory
-                    # If you want to extract to current working directory, don't specify path
-                    zip_file.extract(member=data, path=self.temp_dir)
-                    files.append(data)
+            files = self.extract_and_resize(
+                dataset, raw_data_path)
 
             files.sort(key=lambda x: int(
                 re.search(OsuDataset.FILE_REXEXP, x).groups()[0]))
@@ -177,6 +205,7 @@ class OsuDataset(torch.utils.data.Dataset):
 
             processed = np.stack(processed)
 
+            print(f"Saving Dataset [{dataset[:-4]}]")
             np.save(processed_data_path, processed)
 
             return list(processed[:, 0]), list(processed[:, self.label_index])

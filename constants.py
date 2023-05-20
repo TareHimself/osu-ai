@@ -16,7 +16,7 @@ PLAY_AREA_CAPTURE_PARAMS = derive_capture_params()
 PLAY_AREA_WIDTH_HEIGHT = np.array(
     [PLAY_AREA_CAPTURE_PARAMS[0], PLAY_AREA_CAPTURE_PARAMS[1]])
 
-FINAL_RESIZE_PERCENT = 0.2
+FINAL_RESIZE_PERCENT = 0.1
 
 FINAL_PLAY_AREA_SIZE = (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
     PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT))
@@ -27,8 +27,11 @@ CURRENT_STACK_NUM = 4
 
 FRAME_DELAY = 0.01
 
-if not path.exists(path.join(getcwd(), 'data', 'raw')):
-    makedirs(path.join(getcwd(), 'data', 'raw'))
+MAX_THREADS_FOR_RESIZING = 60
 
-if not path.exists(path.join(getcwd(), 'data', 'processed')):
-    makedirs(path.join(getcwd(), 'data', 'processed'))
+if not path.exists(RAW_DATA_DIR):
+    makedirs(RAW_DATA_DIR)
+
+
+if not path.exists(PROCESSED_DATA_DIR):
+    makedirs(PROCESSED_DATA_DIR)

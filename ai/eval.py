@@ -5,7 +5,7 @@ import win32api
 from threading import Thread
 from torch.nn import Module
 from torch import Tensor
-from ai.models import ActionsNet, AimNet, OsuAiModel
+from ai.models import ActionsNet, AimNet, OsuAiModel, TestModel
 from constants import CURRENT_STACK_NUM, FINAL_RESIZE_PERCENT, FRAME_DELAY, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
 from utils import FixedRuntime
 from windows import WindowCapture
@@ -92,7 +92,7 @@ class ActionsThread(EvalThread):
         super().__init__(model_path, game_window_name, eval_key, stack_num)
 
     def get_model(self) -> OsuAiModel:
-        return ActionsNet()
+       return ActionsNet()
 
     def on_eval_ready(self):
         print(f"Actions Model Ready,Press '{self.eval_key}' To Toggle")
@@ -119,7 +119,7 @@ class AimThread(EvalThread):
         super().__init__(model_path, game_window_name, eval_key, stack_num)
 
     def get_model(self) -> OsuAiModel:
-        return AimNet()
+        return AimNet() 
 
     def on_eval_ready(self):
         print(f"Aim Model Ready,Press '{self.eval_key}' To Toggle")
