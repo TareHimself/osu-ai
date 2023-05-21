@@ -1,4 +1,5 @@
 import asyncio
+import json
 from os import listdir, path, getcwd
 import os
 import socket
@@ -6,8 +7,7 @@ from socket import SHUT_RDWR
 from threading import Thread, Timer, Event
 import time
 import traceback
-from typing import Callable
-import uuid
+from typing import Callable, Union
 from constants import RAW_DATA_DIR
 import torch
 import cv2
@@ -48,27 +48,42 @@ class FixedRuntime():
 
 MESSAGES_SENT = 0
 
+AIM_MODELS = []
+CLICKS_MODELS = []
+MODELS_PATH = './models'
 
-def get_models(prefix="") -> list[str]:
-    models = listdir(path.normpath(path.join(
-        getcwd(), 'models')))
 
-    filtered = []
+def refresh_model_list():
+    global AIM_MODELS
+    global CLICKS_MODELS
+    AIM_MODELS = []
+    CLICKS_MODELS = []
+    for model_id in os.listdir(MODELS_PATH):
 
-    for model in models:
-        if model.startswith(prefix):
-            filtered.append(model)
+        model_path = os.path.join(MODELS_PATH, model_id)
+        with open(os.path.join(model_path, 'info.json'), 'r') as f:
+            data = json.load(f)
+            payload = (model_id, data['dataset'],
+                       data['date'], data['channels'])
+            if data['type'] == 'aim':
+                AIM_MODELS.append(payload)
+            else:
+                CLICKS_MODELS.append(payload)
 
-    return filtered
+
+refresh_model_list()
+
+
+def get_models(model_type: str) -> list[str]:
+    global AIM_MODELS
+    global CLICKS_MODELS
+    if model_type == 'aim':
+        return AIM_MODELS
+    return CLICKS_MODELS
 
 
 def get_datasets() -> list[str]:
     return listdir(RAW_DATA_DIR)
-
-
-def get_model_path(model):
-    return path.normpath(path.join(
-        getcwd(), 'models', model))
 
 
 def get_validated_input(prompt="You forgot to put your own prompt", validate_fn=lambda a: len(a.strip()) != 0,

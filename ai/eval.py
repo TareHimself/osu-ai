@@ -17,16 +17,15 @@ DEFAULT_OSU_WINDOW = "osu! (development)"
 
 class EvalThread(Thread):
 
-    def __init__(self, model_path: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\', stack_num=CURRENT_STACK_NUM,):
+    def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
         super().__init__(group=None, daemon=True)
         self.game_window_name = game_window_name
-        self.model_path = model_path
+        self.model_id = model_id
         self.eval_key = eval_key
-        self.stack_num = stack_num
         self.eval = True
         self.start()
 
-    def get_model(self) -> OsuAiModel:
+    def get_model(self, model_id: str) -> OsuAiModel:
         pass
 
     def on_output(self, output: Tensor):
@@ -40,45 +39,45 @@ class EvalThread(Thread):
 
     @torch.no_grad()
     def run(self):
-        eval_model = self.get_model().to(PYTORCH_DEVICE)
-        eval_model.load(self.model_path)
+        eval_model = self.get_model(self.model_id).to(PYTORCH_DEVICE)
         eval_model.eval()
-        frame_buffer = deque(maxlen=self.stack_num)
-        eval_this_frame = False
+        with torch.inference_mode():
+            frame_buffer = deque(maxlen=eval_model.channels)
+            eval_this_frame = False
 
-        def toggle_eval():
-            nonlocal eval_this_frame
-            eval_this_frame = not eval_this_frame
+            def toggle_eval():
+                nonlocal eval_this_frame
+                eval_this_frame = not eval_this_frame
 
-        keyboard.add_hotkey(self.eval_key, callback=toggle_eval)
+            keyboard.add_hotkey(self.eval_key, callback=toggle_eval)
 
-        cap = WindowCapture(self.game_window_name)
-        self.on_eval_ready()
+            cap = WindowCapture(self.game_window_name)
+            self.on_eval_ready()
 
-        while self.eval:
-            with FixedRuntime(target_time=FRAME_DELAY):
+            while self.eval:
+                with FixedRuntime(target_time=FRAME_DELAY):
 
-                frame, stacked = cap.capture(
-                    list(frame_buffer), self.stack_num, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
-                        PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
+                    frame, stacked = cap.capture(
+                        list(frame_buffer), eval_model.channels, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+                            PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
 
-                frame_buffer.append(frame)
+                    frame_buffer.append(frame)
 
-                if eval_this_frame:
-                    # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
-                    # cv2.waitKey(10)
+                    if eval_this_frame:
+                        # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
+                        # cv2.waitKey(10)
 
-                    converted_frame = torch.from_numpy(stacked / 255).type(
-                        torch.FloatTensor).to(PYTORCH_DEVICE)
+                        converted_frame = torch.from_numpy(stacked / 255).type(
+                            torch.FloatTensor).to(PYTORCH_DEVICE)
 
-                    inputs = converted_frame.reshape(
-                        (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
+                        inputs = converted_frame.reshape(
+                            (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
 
-                    out: torch.Tensor = eval_model(inputs)
+                        out: torch.Tensor = eval_model(inputs)
 
-                    self.on_output(out.detach())
+                        self.on_output(out.detach())
 
-        del cap
+            del cap
 
 
 class ActionsThread(EvalThread):
@@ -88,11 +87,11 @@ class ActionsThread(EvalThread):
         2: "Button 2"
     }
 
-    def __init__(self,  model_path: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\', stack_num=CURRENT_STACK_NUM):
-        super().__init__(model_path, game_window_name, eval_key, stack_num)
+    def __init__(self,  model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
+        super().__init__(model_id, game_window_name, eval_key)
 
-    def get_model(self) -> OsuAiModel:
-       return ActionsNet()
+    def get_model(self, model_id: str) -> OsuAiModel:
+        return ActionsNet.load(model_id)
 
     def on_eval_ready(self):
         print(f"Actions Model Ready,Press '{self.eval_key}' To Toggle")
@@ -115,11 +114,11 @@ class ActionsThread(EvalThread):
 
 
 class AimThread(EvalThread):
-    def __init__(self,  model_path: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\', stack_num=CURRENT_STACK_NUM):
-        super().__init__(model_path, game_window_name, eval_key, stack_num)
+    def __init__(self,  model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
+        super().__init__(model_id, game_window_name, eval_key)
 
-    def get_model(self) -> OsuAiModel:
-        return AimNet() 
+    def get_model(self, model_id: str) -> OsuAiModel:
+        return AimNet.load(model_id)
 
     def on_eval_ready(self):
         print(f"Aim Model Ready,Press '{self.eval_key}' To Toggle")

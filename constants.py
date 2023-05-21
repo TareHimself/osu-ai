@@ -23,7 +23,7 @@ FINAL_PLAY_AREA_SIZE = (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT),
 
 PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-CURRENT_STACK_NUM = 4
+CURRENT_STACK_NUM = 3
 
 FRAME_DELAY = 0.01
 

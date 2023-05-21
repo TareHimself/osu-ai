@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import torch
 from collections import deque
-from utils import FixedRuntime, get_models, get_validated_input, get_model_path
+from utils import FixedRuntime, get_models, get_validated_input
 import torchvision.transforms as transforms
 from ai.models import ActionsNet, AimNet
 from constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
@@ -17,9 +17,9 @@ def start_play(time_between_frames=0):
     try:
         do_prediction = False
 
-        action_models = get_models('model_action_')
+        action_models = get_models('action')
 
-        aim_models = get_models('model_aim_')
+        aim_models = get_models('aim')
 
         user_choice = get_validated_input(f"""What type of model would you like to test?
     [0] Aim Model | {len(aim_models)} Available
@@ -51,12 +51,11 @@ def start_play(time_between_frames=0):
         actions_model = None
 
         if aim_model_index is not None:
-            aim_model = AimThread(model_path=get_model_path(
-                aim_models[aim_model_index]))
+            aim_model = AimThread(model_id=aim_models[aim_model_index][0])
 
         if action_model_index is not None:
             actions_model = ActionsThread(
-                model_path=get_model_path(action_models[action_model_index]))
+                model_id=action_models[action_model_index][0])
 
         try:
             while True:

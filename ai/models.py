@@ -1,8 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import uuid
+import os
+import json
+from datetime import datetime
 from torchvision.models import resnet18, ResNet18_Weights, resnet50, ResNet50_Weights
 from constants import CURRENT_STACK_NUM,  FINAL_PLAY_AREA_SIZE
+from utils import refresh_model_list
 
 
 def res18WithChannels(resnet, channels=4):
@@ -39,20 +44,44 @@ def res18WithChannels(resnet, channels=4):
 
 
 class OsuAiModel(torch.nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, channels=CURRENT_STACK_NUM, model_type: str = 'unknown') -> None:
         super().__init__()
+        self.channels = channels
+        self.model_type = model_type
 
-    def save(self, path: str, data=None):
-        if data is None:
-            torch.save({
-                'state': self.state_dict()
-            }, path)
-        else:
-            torch.save(data, path)
+    def save(self, dataset: str, epochs: int, learning_rate: int, path: str = './models', weights=None):
+        saveId = str(uuid.uuid4())
+        weights_to_save = weights if weights is not None else self.state_dict()
 
-    def load(self, path: str):
-        saved = torch.load(path)
-        self.load_state_dict(saved['state'])
+        save_dir = os.path.join(path, saveId)
+        os.mkdir(save_dir)
+        bin_dir = os.path.join(save_dir, 'bin.pt')
+        torch.save(weights_to_save, bin_dir)
+
+        config = {
+            "channels": self.channels,
+            "date": str(datetime.utcnow()),
+            "dataset": dataset,
+            "type": self.model_type,
+            "epochs": epochs,
+            "lr": learning_rate
+        }
+
+        with open(os.path.join(save_dir, 'info.json'), 'w') as f:
+            json.dump(config, f)
+
+        refresh_model_list()
+
+    def load(model_id: str, model_gen=lambda *a, **b: OsuAiModel(*a, **b)):
+        bin_path = os.path.join('./models', model_id, 'bin.pt')
+        config_path = os.path.join('./models', model_id, 'info.json')
+        weights = torch.load(bin_path)
+        with open(config_path, 'r') as f:
+            config_json = json.load(f)
+            model = model_gen(
+                channels=config_json['channels'], model_type=config_json['type'])
+            model.load_state_dict(weights)
+            return model
 
 
 class AimNet(OsuAiModel):
@@ -63,13 +92,12 @@ class AimNet(OsuAiModel):
         torch (_type_): _description_
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, channels=CURRENT_STACK_NUM, model_type: str = 'aim'):
+        super().__init__(channels, model_type)
         # resnet18()
-
         self.conv = resnet18(weights=None)
         self.conv.conv1 = nn.Conv2d(
-            CURRENT_STACK_NUM, 64, kernel_size=7, stride=2, padding=3, bias=False)
+            self.channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         num_ftrs = self.conv.fc.in_features
         print("FEATURES", num_ftrs)
         self.conv.fc = nn.Sequential(
@@ -85,6 +113,9 @@ class AimNet(OsuAiModel):
     def forward(self, images):
         return self.conv(images)
 
+    def load(model_id: str):
+        return OsuAiModel.load(model_id, lambda *a, **b: AimNet(*a, **b))
+
 
 class ActionsNet(OsuAiModel):
     """
@@ -94,16 +125,19 @@ class ActionsNet(OsuAiModel):
         torch (_type_): _description_
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, channels=CURRENT_STACK_NUM, model_type: str = 'actions'):
+        super().__init__(channels, model_type)
         self.conv = resnet18(weights=None)
         self.conv.conv1 = nn.Conv2d(
-            CURRENT_STACK_NUM, 64, kernel_size=7, stride=2, padding=3, bias=False)
+            self.channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         num_ftrs = self.conv.fc.in_features
         self.conv.fc = nn.Linear(num_ftrs, 3)
 
     def forward(self, images):
         return self.conv(images)
+
+    def load(model_id: str):
+        return OsuAiModel.load(model_id, lambda *a, **b: ActionsNet(*a, **b))
 
 
 class TestModel(OsuAiModel):
