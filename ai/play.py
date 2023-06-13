@@ -59,7 +59,7 @@ def start_play(time_between_frames=0):
 
         try:
             while True:
-                with FixedRuntime(0.01):
+                with FixedRuntime(2):
                     pass
 
         except KeyboardInterrupt as e:

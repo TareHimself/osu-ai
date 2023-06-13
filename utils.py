@@ -159,7 +159,7 @@ class OsuSocketServer:
             timr.cancel()
 
     def recieve_messages(self):
-        while True:
+        while self.active:
             try:
                 if self.socket is not None:
                     message, address = self.socket.recvfrom(1024)

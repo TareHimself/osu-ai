@@ -8,8 +8,8 @@ import torchvision.transforms as transforms
 from ai.models import ActionsNet, AimNet, TestModel
 from torch.utils.data import DataLoader
 from utils import get_datasets, get_validated_input, get_models
-from constants import PYTORCH_DEVICE
-import time
+from constants import PYTORCH_DEVICE, PLAY_AREA_CAPTURE_PARAMS
+
 
 transform = transforms.ToTensor()
 
@@ -18,13 +18,16 @@ PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 SAVE_PATH = path.normpath(path.join(getcwd(), 'models'))
 
 
-def compute_element_wise_accuracy(pred, target, radius: int):
+def compute_element_wise_accuracy(pred, target, radius_px: int = 60):
     total = 0
     total_correct = 0
     for x in range(len(pred)):
-        coord_pred = pred[x]
-        coord_target = target[x]
-        if coord_target[0] - radius <= coord_pred[0] <= coord_target[0] + radius and coord_target[1] - radius <= coord_pred[1] <= coord_target[1] + radius:
+        coord_pred = (pred[x][0] * PLAY_AREA_CAPTURE_PARAMS[0],
+                      pred[x][1] * PLAY_AREA_CAPTURE_PARAMS[1])
+        coord_target = (target[x][0] * PLAY_AREA_CAPTURE_PARAMS[0],
+                        target[x][1] * PLAY_AREA_CAPTURE_PARAMS[1])
+
+        if abs(coord_target[0] - coord_pred[0]) <= radius_px and abs(coord_target[1] - coord_pred[1]) <= radius_px:
             total_correct += 1
 
         total += 1
@@ -32,13 +35,13 @@ def compute_element_wise_accuracy(pred, target, radius: int):
     return total, total_correct
 
 
-def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model_id=None, save_path=SAVE_PATH, batch_size=32,
-                     epochs=1, learning_rate=0.0003, project_name=""):
+def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model_id=None, save_path=SAVE_PATH, batch_size=64,
+                     epochs=1, learning_rate=0.0001, project_name=""):
 
     if len(project_name.strip()) == 0:
-        project_name = "-".join(map(lambda a: a[:-4], datasets))
+        project_name = " <-> ".join(map(lambda a: a[:-4], datasets))
 
-    train_set = OsuDataset(datasets=datasets, frame_latency=0)
+    train_set = OsuDataset(datasets=datasets, frame_latency=2)
 
     osu_data_loader = DataLoader(
         train_set,
@@ -55,11 +58,13 @@ def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model_
         model = ActionsNet().type(torch.FloatTensor).to(PYTORCH_DEVICE)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-    best_loss = 999999999999
-    best_epoch = 0
     best_state = copy.deepcopy(model.state_dict())
+    best_loss = 99999999999
+    best_epoch = 0
+    patience = 20
+    patience_count = 0
 
     try:
         for epoch in range(epochs):
@@ -83,24 +88,37 @@ def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model_
                 total_count += results.size(0)
                 running_loss += loss.item() * images.size(0)
                 loading_bar.set_description_str(
-                    f'Training Actions Using {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.4f} | ')
+                    f'Training Actions Using {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.8f} | ')
                 loading_bar.update()
             loading_bar.set_description_str(
-                f'Training Actions Using {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.4f} | ')
+                f'Training Actions Using {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.8f} | ')
             loading_bar.close()
+            epoch_loss = running_loss / len(osu_data_loader.dataset)
+            epoch_accu = (total_accu / total_count) * 100
 
-            if running_loss / len(osu_data_loader.dataset) < best_loss:
-                best_loss = running_loss / len(osu_data_loader.dataset)
+            if epoch_loss < best_loss:
+                best_loss = epoch_loss
                 best_state = copy.deepcopy(model.state_dict())
                 best_epoch = epoch
+                patience_count = 0
+            else:
+                patience_count += 1
+
+            if patience_count == patience:
+                model.save(project_name, best_epoch,
+                           learning_rate, weights=best_state)
+                break
+
+            # if running_loss / len(osu_data_loader.dataset) < best_loss:
+            #     best_loss = running_loss / len(osu_data_loader.dataset)
+            #     best_state = copy.deepcopy(model.state_dict())
+            #     best_epoch = epoch
 
     except KeyboardInterrupt:
         if get_validated_input("Would you like to save the last epoch?\n", lambda a: True, lambda a: a.strip().lower()).startswith("y"):
             model.save(project_name, best_epoch,
                        learning_rate, weights=best_state)
         return
-
-    model.save(project_name, best_epoch, learning_rate, weights=best_state)
 
 
 def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model_id=None, save_path=SAVE_PATH, batch_size=64,
@@ -127,18 +145,12 @@ def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model_id=None, 
         model = AimNet().to(PYTORCH_DEVICE)
 
     criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
-    MAX_ERROR = 0.001
-
-    CLAMP_MIN = torch.Tensor([0]).to(PYTORCH_DEVICE)
-
-    CLAMP_MAX = torch.Tensor([1]).to(PYTORCH_DEVICE)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
     best_state = copy.deepcopy(model.state_dict())
     best_loss = 99999999999
     best_epoch = 0
-    patience = 50
+    patience = 100
     patience_count = 0
     try:
         for epoch in range(epochs):
@@ -162,7 +174,7 @@ def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model_id=None, 
                 optimizer.step()
 
                 total_calc_size, total_correct_calc = compute_element_wise_accuracy(
-                    outputs, expected, 0.01)
+                    outputs, expected)
                 total_accu += total_correct_calc
                 total_count += total_calc_size
                 running_loss += loss.item() * images.size(0)

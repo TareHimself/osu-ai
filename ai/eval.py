@@ -53,31 +53,29 @@ class EvalThread(Thread):
 
             cap = WindowCapture(self.game_window_name)
             self.on_eval_ready()
+            with torch.inference_mode():
+                while self.eval:
+                    with FixedRuntime(target_time=FRAME_DELAY):
+                        frame, stacked = cap.capture(
+                            list(frame_buffer), eval_model.channels, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
+                                PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
+                        frame_buffer.append(frame)
 
-            while self.eval:
-                with FixedRuntime(target_time=FRAME_DELAY):
+                        if eval_this_frame:
+                            # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
+                            # cv2.waitKey(2)
 
-                    frame, stacked = cap.capture(
-                        list(frame_buffer), eval_model.channels, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
-                            PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
+                            converted_frame = torch.from_numpy(stacked / 255).type(
+                                torch.FloatTensor).to(PYTORCH_DEVICE)
 
-                    frame_buffer.append(frame)
+                            inputs = converted_frame.reshape(
+                                (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
 
-                    if eval_this_frame:
-                        # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
-                        # cv2.waitKey(10)
-
-                        converted_frame = torch.from_numpy(stacked / 255).type(
-                            torch.FloatTensor).to(PYTORCH_DEVICE)
-
-                        inputs = converted_frame.reshape(
-                            (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
-
-                        out: torch.Tensor = eval_model(inputs)
-
-                        self.on_output(out.detach())
+                            out: torch.Tensor = eval_model(inputs)
+                            self.on_output(out.detach())
 
             del cap
+            keyboard.remove_hotkey(toggle_eval)
 
 
 class ActionsThread(EvalThread):

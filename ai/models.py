@@ -99,7 +99,6 @@ class AimNet(OsuAiModel):
         self.conv.conv1 = nn.Conv2d(
             self.channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         num_ftrs = self.conv.fc.in_features
-        print("FEATURES", num_ftrs)
         self.conv.fc = nn.Sequential(
             nn.Linear(num_ftrs, 512),
             nn.ReLU(),
@@ -131,7 +130,12 @@ class ActionsNet(OsuAiModel):
         self.conv.conv1 = nn.Conv2d(
             self.channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         num_ftrs = self.conv.fc.in_features
-        self.conv.fc = nn.Linear(num_ftrs, 3)
+        self.conv.fc = nn.Sequential(
+            nn.Linear(num_ftrs, 512),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+            nn.Linear(512, 3),
+        )
 
     def forward(self, images):
         return self.conv(images)
