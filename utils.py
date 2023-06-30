@@ -4,15 +4,17 @@ from os import listdir, path, getcwd
 import os
 import socket
 from socket import SHUT_RDWR
+from tempfile import TemporaryDirectory
 from threading import Thread, Timer, Event
 import time
 import traceback
+import numpy as np
 from typing import Callable, Union
 from constants import RAW_DATA_DIR
-import torch
+from mss import mss
 import cv2
 from queue import Queue
-
+from tqdm import tqdm
 from windows import WindowCapture
 
 """
@@ -128,14 +130,14 @@ class FileWatcher(Thread):
 
 class OsuSocketServer:
     def __init__(self, on_state_updated) -> None:
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.on_state_updated = on_state_updated
         self.pending_messages = {}
 
     def connect(self):
         self.active = True
-        self.socket.bind(("127.0.0.1", 9200))
-        self.client = ("127.0.0.1", 9500)
+        self.sock.bind(("127.0.0.1", 11000))
+        self.osu_game = ("127.0.0.1", 12000)
         self.t1 = Thread(group=None, target=self.recieve_messages, daemon=True)
         self.t1.start()
 
@@ -161,16 +163,16 @@ class OsuSocketServer:
     def recieve_messages(self):
         while self.active:
             try:
-                if self.socket is not None:
-                    message, address = self.socket.recvfrom(1024)
+                if self.sock is not None:
+                    message, address = self.sock.recvfrom(1024)
                     message = message.decode("utf-8")
                     self.on_message_internal(message)
             except socket.timeout:
                 break
 
     def send(self, message: str):
-        self.socket.sendto(
-            f"NONE|{message}".encode("utf-8"), self.client)
+        self.sock.sendto(
+            f"NONE|{message}".encode("utf-8"), self.osu_game)
 
     def cancel_send_and_wait(self, m_id, value):
         if m_id in self.pending_messages.keys():
@@ -187,25 +189,25 @@ class OsuSocketServer:
         self.pending_messages[message_id] = task, loop, Timer(timeout, self.cancel_send_and_wait, [
             message_id, timeout_value])
         self.pending_messages[message_id][2].start()
-        self.socket.sendto(
-            f"{message_id}|{message}".encode("utf-8"), self.client)
+        self.sock.sendto(
+            f"{message_id}|{message}".encode("utf-8"), self.osu_game)
         result = await task
         return result
 
     def kill(self):
         if self.active:
-            target = self.socket
-            self.socket = None
+            target = self.sock
+            self.sock = None
             target.settimeout(1)
             target.shutdown(SHUT_RDWR)
             target.close()
         self.active = False
 
 
-class RecorderThread(Thread):
-    def __init__(self, rate: int):
+class ScreenRecorder(Thread):
+    def __init__(self, fps: int = 30):
         super().__init__(group=None, daemon=True)
-        self.rate = rate
+        self.fps = fps
         self.stop_event = Event()
         self.start()
 
@@ -213,40 +215,44 @@ class RecorderThread(Thread):
         self.stop_event.set()
 
     def run(self):
-        print(self.rate, 1/self.rate)
-        source = cv2.VideoWriter_fourcc(*"XVID")
-        cap = WindowCapture()
-        writer = cv2.VideoWriter(
-            f"{int(time.time() * 1000)}.avi", source, self.rate, (1920, 1080))
+        filename = f"{int(time.time() * 1000)}.avi"
+        write_buff = Queue()
+        with TemporaryDirectory() as record_dir:
 
-        while True:
-            with FixedRuntime(1 / self.rate, 'Screen'):
-                writer.write(cap.capture())
-                if self.stop_event.is_set():
-                    break
+            def write_frames():
+                frames_saved = 0
 
-        writer.release()
+                frame = write_buff.get()
 
+                while frame is not None:
+                    frame = np.array(frame)
+                    cv2.imwrite(
+                        path.join(record_dir, f'{frames_saved}.png'), frame)
+                    frames_saved += 1
+                    frame = write_buff.get()
 
-class ScreenRecorder():
-    def __init__(self, rate: int = 30):
-        self.rate = rate
-        self.thread = None
+            write_thread = Thread(target=write_frames, group=None, daemon=True)
+            write_thread.start()
 
-    def start(self):
-        if self.thread is not None:
-            self.thread.stop()
+            with mss() as sct:
+                while True:
+                    with FixedRuntime(1 / (self.fps)):
+                        write_buff.put(sct.grab(sct.monitors[1]))
+                        if self.stop_event.is_set():
+                            break
 
-        self.thread = RecorderThread(rate=self.rate)
+            write_buff.put(None)
+            write_thread.join()
 
-    def stop(self):
-        if self.thread is not None:
-            self.thread.stop()
-            self.thread = None
+            files = os.listdir(record_dir)
+            files.sort(key=lambda a: int(a.split('.')[0]))
 
-    def __enter__(self):
-        self.start()
-        return self
+            source = cv2.VideoWriter_fourcc(*"MJPG")
 
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        self.stop()
+            writer = cv2.VideoWriter(
+                filename, source, float(self.fps), (1920, 1080))
+
+            for file in tqdm(files, desc=f"Generating Video from {len(files)} frames."):
+                writer.write(cv2.imread(path.join(record_dir, file)))
+
+            writer.release()
