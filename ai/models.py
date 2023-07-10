@@ -49,7 +49,7 @@ class OsuAiModel(torch.nn.Module):
         self.channels = channels
         self.model_type = model_type
 
-    def save(self, dataset: str, epochs: int, learning_rate: int, path: str = './models', weights=None):
+    def save(self, project_name:str,datasets: list[str], epochs: int, learning_rate: int, path: str = './models', weights=None):
         saveId = str(uuid.uuid4())
         weights_to_save = weights if weights is not None else self.state_dict()
 
@@ -59,9 +59,10 @@ class OsuAiModel(torch.nn.Module):
         torch.save(weights_to_save, bin_dir)
 
         config = {
+            "name": project_name,
             "channels": self.channels,
             "date": str(datetime.utcnow()),
-            "dataset": dataset,
+            "datasets": datasets,
             "type": self.model_type,
             "epochs": epochs,
             "lr": learning_rate

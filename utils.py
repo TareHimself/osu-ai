@@ -65,8 +65,8 @@ def refresh_model_list():
         model_path = os.path.join(MODELS_PATH, model_id)
         with open(os.path.join(model_path, 'info.json'), 'r') as f:
             data = json.load(f)
-            payload = (model_id, data['dataset'],
-                       data['date'], data['channels'])
+            payload = (model_id, data['name'],
+                       data['date'], data['channels'],data['datasets'])
             if data['type'] == 'aim':
                 AIM_MODELS.append(payload)
             else:
@@ -89,10 +89,10 @@ def get_datasets() -> list[str]:
 
 
 def get_validated_input(prompt="You forgot to put your own prompt", validate_fn=lambda a: len(a.strip()) != 0,
-                        conversion_fn=lambda a: a.strip()):
+                        conversion_fn=lambda a: a.strip(), validation_error_message_fn=lambda a: "Invalid input, please try again."):
     input_as_str = input(prompt)
     if not validate_fn(input_as_str):
-        print("Invalid input, please try again.")
+        print(validation_error_message_fn(input_as_str))
         return get_validated_input(prompt, validate_fn, conversion_fn)
 
     return conversion_fn(input_as_str)

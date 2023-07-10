@@ -10,7 +10,7 @@ import torchvision.transforms as transforms
 from ai.models import ActionsNet, AimNet
 from constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
 from ai.eval import ActionsThread, AimThread
-
+import traceback
 
 def start_play(time_between_frames=0):
     global do_prediction
@@ -68,4 +68,4 @@ def start_play(time_between_frames=0):
             if aim_model is not None:
                 aim_model.kill()
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())

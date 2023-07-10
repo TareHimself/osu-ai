@@ -1,6 +1,5 @@
 import re
-import uuid
-from os import getcwd, listdir, path, makedirs, unlink
+from os import path
 import cv2
 import numpy as np
 import torch
@@ -37,26 +36,15 @@ class OsuDataset(torch.utils.data.Dataset):
     LABEL_TYPE_AIM = 2
     FILE_REXEXP = r"[a-zA-Z0-9\(\)\s]+-([0-9]+),[0-1],[0-1],[0-9]+,[0-9]+.png"
 
-    def __init__(self, datasets: list[str], frame_latency=3, label_type=LABEL_TYPE_ACTIONS, force_rebuild=False) -> None:
+    def __init__(self, datasets: list[str], label_type=LABEL_TYPE_ACTIONS, force_rebuild=False) -> None:
         self.datasets = datasets
-        self.images = []
         self.labels = []
-        self.frame_latency = frame_latency
+        self.images = []
         self.label_index = label_type
         self.data_to_process = Queue()
         self.force_rebuild = force_rebuild
 
         self.make_training_data()
-        self.apply_frame_latency()
-
-    def apply_frame_latency(self):
-        for i in range(abs(self.frame_latency)):
-            if(self.frame_latency > 0):
-                self.labels.pop(0)
-                self.images.pop()
-            else:
-                self.labels.pop()
-                self.images.pop(0)
 
     def extract_info(self, frame, state):
         # greyscale
@@ -192,9 +180,16 @@ class OsuDataset(torch.utils.data.Dataset):
                 frame, key_state, mouse_state = self.extract_info(
                     frame, state)
 
-                stacked = self.stack_frames(frame_queue, frame)
-                # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
-                # cv2.waitKey(2)
+                
+                drawn = frame
+                # x,y = (int((mouse_state[0] * PLAY_AREA_CAPTURE_PARAMS[0]) / FINAL_RESIZE_PERCENT),int((mouse_state[1] * PLAY_AREA_CAPTURE_PARAMS[1]) / FINAL_RESIZE_PERCENT))
+                # print(x,y)
+                # drawn = cv2.circle(frame,(x,y),3,(255,255,255),2)
+
+                stacked = self.stack_frames(frame_queue, drawn)
+                # transp = stacked.transpose(1, 2, 0)
+                # cv2.imshow("Debug", transp)
+                # cv2.waitKey(0)
 
                 processed.append(
                     np.array([stacked, key_state, mouse_state], dtype=object))
@@ -213,7 +208,7 @@ class OsuDataset(torch.utils.data.Dataset):
 
             self.data_to_process.put(None)
 
-            print(e, traceback.format_exc())
+            traceback.print_exception()
 
             return [], []
 
@@ -224,19 +219,48 @@ class OsuDataset(torch.utils.data.Dataset):
             with TemporaryDirectory() as temp_dir:
                 self.temp_dir = temp_dir
                 for dataset in self.datasets:
-                    images, labels = self.get_or_create_dataset(
+                    images_created, labels_created = self.get_or_create_dataset(
                         temp_dir, dataset)
-                    self.images.extend(images)
-                    self.labels.extend(labels)
+                    self.images.extend(images_created)
+                    self.labels.extend(labels_created)
+
+            if self.label_index == OsuDataset.LABEL_TYPE_ACTIONS:
+                unique_labels = list(set(self.labels))
+                counts = {}
+                for label in unique_labels:
+                    counts[label] = 0
+
+                for label in self.labels:
+                    counts[label] += 1
+
+                print("Initial Data Balance",counts)
+                target_ammount = max(counts.values())
+                for label in counts.keys():
+                    if counts[label] < target_ammount:
+                        label_examples = [self.images[x]
+                                          for x in range(len(self.labels)) if self.labels[x] == label]
+                        len_examples = len(label_examples)
+                        for i in range(target_ammount - counts[label]):
+                            self.labels.append(label)
+                            self.images.append(
+                                label_examples[i % len_examples])
+
+                for label in unique_labels:
+                    counts[label] = 0
+
+                for label in self.labels:
+                    counts[label] += 1
+
+                print("Final Data Balance", counts)
 
         except Exception as e:
-            print(e, traceback.format_exc())
+            print(traceback.format_exc())
 
     def __getitem__(self, idx):
         return self.images[idx], self.labels[idx]
 
     def __len__(self):
-        return len(self.images)
+        return len(self.labels)
 
 
 # np.save('test_data.npy', extract_data_from_image(

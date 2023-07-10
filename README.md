@@ -4,7 +4,7 @@
 
 ## Info
 
-- Data is mainly gotten from autoplay but should also work on replays.
+- Data extracted from replays produced by a slightly modified version of [danser-go](https://github.com/Wieku/danser-go)
 
 - There are two seperate models, one for clicking and one for aiming.
 
@@ -12,10 +12,10 @@
 
 - Showcase videos [Clicking](https://www.youtube.com/watch?v=ZgHyN98iR1M&t=5s) and [Aiming](https://www.youtube.com/watch?v=YEoSrtow8Qw).
 
-- This repo only works on windows due to how screenshots are taken during testing.
+- This repo only works on windows due to how screenshots are taken during testing (Note this is being worked on).
 
 ## Quick Start
-
+### Note this process is currently being worked on and may not currently work
 - The following assume that your monitor/screen size is 1920x1080 (plan to make it dynamic later)
 - Clone this repository and also these forked repositories [osu-framework](https://github.com/TareHimself/osu-framework) and [osu lazer](https://github.com/TareHimself/osu-ml). make sure that osu-framework and osu lazer are in the same directory
 - Open up the cloned osu lazer repo and replace the first line in "config.txt" with the path to your cloned version of this repo.

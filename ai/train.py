@@ -5,7 +5,7 @@ import torch.nn as nn
 from tqdm import tqdm
 from ai.dataset import OsuDataset
 import torchvision.transforms as transforms
-from ai.models import ActionsNet, AimNet, TestModel
+from ai.models import ActionsNet, AimNet
 from torch.utils.data import DataLoader
 from utils import get_datasets, get_validated_input, get_models
 from constants import PYTORCH_DEVICE, PLAY_AREA_CAPTURE_PARAMS
@@ -39,9 +39,10 @@ def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model_
                      epochs=1, learning_rate=0.0001, project_name=""):
 
     if len(project_name.strip()) == 0:
-        project_name = " <-> ".join(map(lambda a: a[:-4], datasets))
+        project_name = f"Unamed Project with {len(datasets)} Datasets"
 
-    train_set = OsuDataset(datasets=datasets, frame_latency=2)
+    train_set = OsuDataset(
+        datasets=datasets, label_type=OsuDataset.LABEL_TYPE_ACTIONS)
 
     osu_data_loader = DataLoader(
         train_set,
@@ -88,10 +89,10 @@ def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model_
                 total_count += results.size(0)
                 running_loss += loss.item() * images.size(0)
                 loading_bar.set_description_str(
-                    f'Training Actions Using {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.8f} | ')
+                    f'Training Actions | {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.8f} | ')
                 loading_bar.update()
             loading_bar.set_description_str(
-                f'Training Actions Using {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.8f} | ')
+                f'Training Actions | {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.8f} | ')
             loading_bar.close()
             epoch_loss = running_loss / len(osu_data_loader.dataset)
             epoch_accu = (total_accu / total_count) * 100
@@ -105,7 +106,7 @@ def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model_
                 patience_count += 1
 
             if patience_count == patience:
-                model.save(project_name, best_epoch,
+                model.save(project_name,datasets, best_epoch,
                            learning_rate, weights=best_state)
                 break
 
@@ -116,18 +117,19 @@ def train_action_net(datasets: list[str], force_rebuild=False, checkpoint_model_
 
     except KeyboardInterrupt:
         if get_validated_input("Would you like to save the last epoch?\n", lambda a: True, lambda a: a.strip().lower()).startswith("y"):
-            model.save(project_name, best_epoch,
+            model.save(project_name,datasets, best_epoch,
                        learning_rate, weights=best_state)
         return
 
 
 def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model_id=None, save_path=SAVE_PATH, batch_size=64,
                   epochs=1, learning_rate=0.0001, project_name=""):
+    
     if len(project_name.strip()) == 0:
-        project_name = "-".join(map(lambda a: a[:-4], datasets))
+        project_name = f"Unamed Project with {len(datasets)} Datasets"
 
-    train_set = OsuDataset(datasets=datasets,
-                           frame_latency=0, label_type=2)
+    train_set = OsuDataset(
+        datasets=datasets, label_type=OsuDataset.LABEL_TYPE_AIM)
 
     osu_data_loader = DataLoader(
         train_set,
@@ -179,12 +181,12 @@ def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model_id=None, 
                 total_count += total_calc_size
                 running_loss += loss.item() * images.size(0)
                 loading_bar.set_description_str(
-                    f'Training Aim Using {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.10f} | ')
+                    f'Training Aim | {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {((total_accu / total_count) * 100):.4f} | loss {(running_loss / len(osu_data_loader.dataset)):.10f} | ')
                 loading_bar.update()
             epoch_loss = running_loss / len(osu_data_loader.dataset)
             epoch_accu = (total_accu / total_count) * 100
             loading_bar.set_description_str(
-                f'Training Aim Using {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {(epoch_accu):.4f} | loss {(epoch_loss):.10f} | ')
+                f'Training Aim | {project_name} | epoch {epoch + 1}/{epochs} |  Accuracy {(epoch_accu):.4f} | loss {(epoch_loss):.10f} | ')
             loading_bar.close()
             if epoch_loss < best_loss:
                 best_loss = epoch_loss
@@ -195,17 +197,17 @@ def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model_id=None, 
                 patience_count += 1
 
             if patience_count == patience:
-                model.save(project_name, best_epoch,
+                model.save(project_name,datasets, best_epoch,
                            learning_rate, weights=best_state)
                 return
     except KeyboardInterrupt:
         if get_validated_input("Would you like to save the best epoch?\n", lambda a: True, lambda a: a.strip().lower()).startswith("y"):
-            model.save(project_name, best_epoch,
+            model.save(project_name,datasets, best_epoch,
                        learning_rate, weights=best_state)
 
         return
 
-    model.save(project_name, best_epoch, learning_rate, weights=best_state)
+    model.save(project_name,datasets, best_epoch, learning_rate, weights=best_state)
 
 
 def get_train_data(data_type, datasets, datasets_prompt, models, models_prompt):

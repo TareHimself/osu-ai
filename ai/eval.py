@@ -5,14 +5,14 @@ import win32api
 from threading import Thread
 from torch.nn import Module
 from torch import Tensor
-from ai.models import ActionsNet, AimNet, OsuAiModel, TestModel
-from constants import CURRENT_STACK_NUM, FINAL_RESIZE_PERCENT, FRAME_DELAY, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
+from ai.models import ActionsNet, AimNet, OsuAiModel
+from constants import FINAL_RESIZE_PERCENT, FRAME_DELAY, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
 from utils import FixedRuntime
 from windows import WindowCapture
 from collections import deque
 import cv2
 #'osu!'  #
-DEFAULT_OSU_WINDOW = 'osu!'  # "osu! (development)"
+DEFAULT_OSU_WINDOW = 'osu!'  #"osu! (development)"
 
 
 class EvalThread(Thread):
@@ -56,6 +56,7 @@ class EvalThread(Thread):
             with torch.inference_mode():
                 while self.eval:
                     with FixedRuntime(target_time=FRAME_DELAY):
+                        start = time.time()
                         frame, stacked = cap.capture(
                             list(frame_buffer), eval_model.channels, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
                                 PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
@@ -63,7 +64,7 @@ class EvalThread(Thread):
 
                         if eval_this_frame:
                             # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
-                            # cv2.waitKey(2)
+                            # cv2.waitKey(1)
 
                             converted_frame = torch.from_numpy(stacked / 255).type(
                                 torch.FloatTensor).to(PYTORCH_DEVICE)
@@ -73,6 +74,8 @@ class EvalThread(Thread):
 
                             out: torch.Tensor = eval_model(inputs)
                             self.on_output(out.detach())
+                            end = time.time() - start
+                            # print(f"Delay {end}")
 
             del cap
             keyboard.remove_hotkey(toggle_eval)
@@ -114,6 +117,7 @@ class ActionsThread(EvalThread):
 class AimThread(EvalThread):
     def __init__(self,  model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
         super().__init__(model_id, game_window_name, eval_key)
+
 
     def get_model(self, model_id: str) -> OsuAiModel:
         return AimNet.load(model_id)
