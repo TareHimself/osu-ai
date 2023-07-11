@@ -1,14 +1,5 @@
-import keyboard
-from windows import WindowCapture
-import time
-import cv2
-import numpy as np
-import torch
-from collections import deque
+
 from utils import FixedRuntime, get_models, get_validated_input
-import torchvision.transforms as transforms
-from ai.models import ActionsNet, AimNet
-from constants import FINAL_RESIZE_PERCENT, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
 from ai.eval import ActionsThread, AimThread
 import traceback
 

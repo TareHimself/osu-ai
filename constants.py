@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import torch
 from os import getcwd, path, makedirs
+from enum import Enum
 from windows import derive_capture_params
 
 ASSETS_DIR = path.normpath(path.join(getcwd(), 'assets'))
@@ -11,6 +12,12 @@ RAW_DATA_DIR = path.normpath(path.join(
     getcwd(), 'data', 'raw'))
 PROCESSED_DATA_DIR = path.normpath(path.join(
     getcwd(), 'data', 'processed'))
+
+class PLAY_AREA_INDICES():
+    WIDTH = 0
+    HEIGHT = 1
+    X_OFFSET = 2
+    Y_OFFSET = 3
 
 PLAY_AREA_CAPTURE_PARAMS = derive_capture_params()
 PLAY_AREA_WIDTH_HEIGHT = np.array(

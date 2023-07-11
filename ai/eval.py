@@ -1,4 +1,6 @@
 import time
+import cv2
+import numpy as np
 import torch
 import keyboard
 import win32api
@@ -6,11 +8,10 @@ from threading import Thread
 from torch.nn import Module
 from torch import Tensor
 from ai.models import ActionsNet, AimNet, OsuAiModel
-from constants import FINAL_RESIZE_PERCENT, FRAME_DELAY, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE
+from constants import FINAL_RESIZE_PERCENT, FRAME_DELAY, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE,PLAY_AREA_INDICES
 from utils import FixedRuntime
-from windows import WindowCapture
 from collections import deque
-import cv2
+from mss import mss
 #'osu!'  #
 DEFAULT_OSU_WINDOW = 'osu!'  #"osu! (development)"
 
@@ -51,33 +52,44 @@ class EvalThread(Thread):
 
             keyboard.add_hotkey(self.eval_key, callback=toggle_eval)
 
-            cap = WindowCapture(self.game_window_name)
             self.on_eval_ready()
             with torch.inference_mode():
-                while self.eval:
-                    with FixedRuntime(target_time=FRAME_DELAY):
-                        start = time.time()
-                        frame, stacked = cap.capture(
-                            list(frame_buffer), eval_model.channels, (int(PLAY_AREA_CAPTURE_PARAMS[0] * FINAL_RESIZE_PERCENT), int(
-                                PLAY_AREA_CAPTURE_PARAMS[1] * FINAL_RESIZE_PERCENT)), *PLAY_AREA_CAPTURE_PARAMS)
-                        frame_buffer.append(frame)
+                with mss() as sct:
+                    monitor = monitor = {"top": PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.Y_OFFSET], "left": PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.X_OFFSET], "width": PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.WIDTH], "height": PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.HEIGHT]}
+                    
+                    while self.eval:
+                        with FixedRuntime(target_time=FRAME_DELAY): # limit capture to every "FRAME_DELAY" seconds
+                            if eval_this_frame:
+                                frame = np.array(sct.grab(monitor))
+                                frame = cv2.resize(cv2.cvtColor(frame,cv2.COLOR_RGB2GRAY),(int(PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.WIDTH] * FINAL_RESIZE_PERCENT), int(
+                                        PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.HEIGHT] * FINAL_RESIZE_PERCENT)))
 
-                        if eval_this_frame:
-                            # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
-                            # cv2.waitKey(1)
+                                needed = eval_model.channels - len(frame_buffer)
 
-                            converted_frame = torch.from_numpy(stacked / 255).type(
-                                torch.FloatTensor).to(PYTORCH_DEVICE)
+                                if needed > 0:
+                                    for i in range(needed):
+                                        frame_buffer.append(frame)
+                                else:
+                                    frame_buffer.append(frame)
 
-                            inputs = converted_frame.reshape(
-                                (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
+                                stacked = np.stack(frame_buffer)
 
-                            out: torch.Tensor = eval_model(inputs)
-                            self.on_output(out.detach())
-                            end = time.time() - start
-                            # print(f"Delay {end}")
+                                start = time.time()
+                                frame_buffer.append(frame)
+                                # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
+                                # cv2.waitKey(1)
 
-            del cap
+                                converted_frame = torch.from_numpy(stacked / 255).type(
+                                    torch.FloatTensor).to(PYTORCH_DEVICE)
+
+                                inputs = converted_frame.reshape(
+                                    (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
+
+                                out: torch.Tensor = eval_model(inputs)
+                                self.on_output(out.detach())
+                                end = time.time() - start
+                                # print(f"Delay {end}") # debug capture speed
+
             keyboard.remove_hotkey(toggle_eval)
 
 

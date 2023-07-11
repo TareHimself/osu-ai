@@ -15,7 +15,6 @@ from mss import mss
 import cv2
 from queue import Queue
 from tqdm import tqdm
-from windows import WindowCapture
 
 """
     Ensures this context runs for the given fixed time or more
