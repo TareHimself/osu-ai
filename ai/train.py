@@ -149,6 +149,8 @@ def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model_id=None, 
     criterion = nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
+    scaler = torch.cuda.amp.grad_scaler.GradScaler()
+
     best_state = copy.deepcopy(model.state_dict())
     best_loss = 99999999999
     best_epoch = 0
@@ -166,14 +168,19 @@ def train_aim_net(datasets: str, force_rebuild=False, checkpoint_model_id=None, 
                 expected: torch.Tensor = expected.type(
                     torch.FloatTensor).to(PYTORCH_DEVICE)
 
+                
+
+                with torch.cuda.amp.autocast_mode.autocast():
+                    outputs: torch.Tensor = model(images)
+
+                    loss = criterion(outputs, expected)
+
+
                 optimizer.zero_grad()
 
-                outputs: torch.Tensor = model(images)
-
-                loss = criterion(outputs, expected)
-
-                loss.backward()
-                optimizer.step()
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
 
                 total_calc_size, total_correct_calc = compute_element_wise_accuracy(
                     outputs, expected)

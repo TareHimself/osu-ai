@@ -138,6 +138,7 @@ with open(CONFIG_PATH,'r') as f:
             frames_skipped += 1 # cap.read is the same as frames - 1 so we have to account for that
 
             if read_success:
+                # print(cur_time,ms_diff)
                 # cv2.imshow("Window",cv2.circle(frame,(int(x) - 5,int(y) - 5),10,(255,255,255),3))
                 # cv2.waitKey(0)
                 write_queue.put((sample, frame))

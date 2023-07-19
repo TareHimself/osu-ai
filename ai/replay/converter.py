@@ -10,41 +10,14 @@ import os
 from .utils import Cv2VideoContext, run_file
 
 
-
-
-# def sample_frames_in_range(queue,video_path,range_to_sample,events):
-#     with Cv2VideoContext(video_path) as sample_target:
-#         sampler = EventsSampler(events)
-#         for i in range_to_sample:
-#             sample = sampler.sample(i)
-#             cur_time, x, y, keys_bool = sample
-
-#             sample_target.cap.set(
-#                 cv2.CAP_PROP_POS_MSEC, cur_time)
-#             # print(i,cur_time)
-#             read_success, frame = sample_target.cap.read()
-#             if read_success:
-#                 # print(i,cur_time)
-#                 queue.put((sample, frame))
-#                 # cv2.rectangle(frame, (round(PLAYFIELD_OFFSET_X), round(PLAYFIELD_OFFSET_Y)), (round(
-#                 #     PLAYFIELD_OFFSET_X + PLAYFIELD_SCREEN_WIDTH), round(PLAYFIELD_OFFSET_Y + PLAYFIELD_SCREEN_HEIGHT)), (255, 0, 0), 2)
-#                 # cv2.circle(frame, (x - 10, y + 10),
-#                 #            10, (255, 255, 255), 2)
-
-#                 # cv2.imshow('EVENT FRAME', frame)
-#                 # cv2.waitKey(0)
-                
-#             else:
-#                 queue.put((None,None))
-
 class ReplayConverter:
-    def __init__(self, project_name: str, danser_video: str, replay_json: str,save_dir: str = "", num_readers=5, frame_time_ms=10,frame_offset_ms = 0) -> None:
+    def __init__(self, project_name: str, danser_video: str, replay_json: str,save_dir: str = "", num_readers=5, frame_interval_ms=10,frame_offset_ms = 0) -> None:
         self.project_name = project_name
         self.save_dir = save_dir
         self.danser_video = danser_video
         self.replay_json = replay_json
         self.num_readers = num_readers
-        self.sample_ms = frame_time_ms
+        self.frame_interval_ms = frame_interval_ms
         self.frame_offset_ms = frame_offset_ms
         self.debug = True
         self.build_dataset()
@@ -112,20 +85,25 @@ class ReplayConverter:
                         "end": b["end"] - time_offset
                     })
 
-                ms_to_sample = int(events[len(events) - 1]['time'])
+                stop_time = int(events[len(events) - 1]['time'])
 
-                iter_target = range(0, ms_to_sample, 10)
-                iter_target = []
-                for i in range(0, ms_to_sample, 100):
-                    should_add = True
-                    for item in breaks:
-                        if item['start'] <= i <= item["end"]:
-                            should_add = False
-                            break
-                    # if i == 0:
-                    #     print("ZERO ELEMENT", should_add)
-                    if should_add:
-                        iter_target.append(i)
+                iter_target = range(0, stop_time, self.frame_interval_ms)
+
+                remove_breaks = True
+
+                if remove_breaks:
+                    new_iter_target = []
+                    for i in iter_target:
+                        should_add = True
+                        for item in breaks:
+                            if item['start'] <= i <= item["end"]:
+                                should_add = False
+                                break
+                        # if i == 0:
+                        #     print("ZERO ELEMENT", should_add)
+                        if should_add:
+                            new_iter_target.append(i)
+                    iter_target = new_iter_target
 
 
                 num_readers = self.num_readers
@@ -171,6 +149,7 @@ class ReplayConverter:
                     def write_to_zip():
                             nonlocal zip_buff
                             nonlocal zip
+                            nonlocal loadng_bar
                             data = zip_buff.get()
                             while data is not None:
                                 file_path, file_name = data

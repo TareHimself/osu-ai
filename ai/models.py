@@ -4,11 +4,25 @@ import torch.nn.functional as F
 import uuid
 import os
 import json
+import timm
+from typing import Callable
 from datetime import datetime
 from torchvision.models import resnet18, ResNet18_Weights, resnet50, ResNet50_Weights
 from constants import CURRENT_STACK_NUM,  FINAL_PLAY_AREA_SIZE
 from utils import refresh_model_list
 
+
+
+def get_timm_model(build_final_layer: Callable[[int],nn.Module] = lambda a: nn.Linear(a,2),channels = 3,model_name="resnet18",pretrained=False):
+    model = timm.create_model(model_name=model_name,pretrained=pretrained,in_chans=channels,num_classes=3)
+    # model = timm.create_model("resnet18",pretrained=True,in_chans=3,num_classes=3)
+    classifier = model.default_cfg['classifier']
+    
+    in_features = getattr(model,classifier).in_features  # Get the number of input features for the final layer
+
+    setattr(model,classifier,build_final_layer(in_features)) # Replace the final layer
+
+    return model
 
 def res18WithChannels(resnet, channels=4):
 
@@ -96,19 +110,34 @@ class AimNet(OsuAiModel):
     def __init__(self, channels=CURRENT_STACK_NUM, model_type: str = 'aim'):
         super().__init__(channels, model_type)
         # resnet18()
-        self.conv = resnet18(weights=None)
-        self.conv.conv1 = nn.Conv2d(
-            self.channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        num_ftrs = self.conv.fc.in_features
-        self.conv.fc = nn.Sequential(
-            nn.Linear(num_ftrs, 512),
+        # self.conv = resnet18(weights=None)
+        # self.conv.conv1 = nn.Conv2d(
+        #     self.channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        # num_ftrs = self.conv.fc.in_features
+        # self.conv.fc = nn.Sequential(
+        #     nn.Linear(num_ftrs, 512),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.3),
+        #     nn.Linear(512, 256),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.3),
+        #     nn.Linear( 256,128),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.3),
+        #     nn.Linear(128, 2),
+        #     nn.Sigmoid()
+        # )
+
+        self.conv = get_timm_model(build_final_layer = lambda features: nn.Sequential(
+            nn.Linear(features, 512),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(512, 256),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(256, 2),
-        )
+            nn.Sigmoid()
+        ),channels=channels)
 
     def forward(self, images):
         return self.conv(images)
@@ -127,16 +156,24 @@ class ActionsNet(OsuAiModel):
 
     def __init__(self, channels=CURRENT_STACK_NUM, model_type: str = 'actions'):
         super().__init__(channels, model_type)
-        self.conv = resnet18(weights=None)
-        self.conv.conv1 = nn.Conv2d(
-            self.channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        num_ftrs = self.conv.fc.in_features
-        self.conv.fc = nn.Sequential(
-            nn.Linear(num_ftrs, 512),
+        # self.conv = resnet18(weights=None)
+        # self.conv.conv1 = nn.Conv2d(
+        #     self.channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        # num_ftrs = self.conv.fc.in_features
+        # self.conv.fc = nn.Sequential(
+        #     nn.Linear(num_ftrs, 512),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.4),
+        #     nn.Linear(512, 3),
+        # )
+
+
+        self.conv = get_timm_model(build_final_layer = lambda features: nn.Sequential(
+            nn.Linear(features, 512),
             nn.ReLU(),
             nn.Dropout(0.4),
             nn.Linear(512, 3),
-        )
+        ),channels=channels)
 
     def forward(self, images):
         return self.conv(images)

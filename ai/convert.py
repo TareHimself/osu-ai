@@ -23,6 +23,5 @@ def start_convert():
     try:
         ReplayConverter(project_name, rendered_path, replay_json,
                         RAW_DATA_DIR, num_readers=num_threads,frame_offset_ms=offset_ms)
-    except Exception as e:
-
-        print(traceback.format_exc())
+    except:
+        traceback.print_exc()

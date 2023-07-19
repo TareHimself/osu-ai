@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from threading import Thread, Timer, Event
 import time
 import traceback
+from datetime import datetime
 import numpy as np
 from typing import Callable, Union
 from constants import RAW_DATA_DIR
@@ -70,6 +71,9 @@ def refresh_model_list():
                 AIM_MODELS.append(payload)
             else:
                 CLICKS_MODELS.append(payload)
+
+    AIM_MODELS = sorted(AIM_MODELS,key= lambda a: 0 - datetime.strptime(a[2],"%Y-%m-%d %H:%M:%S.%f").timestamp())
+    CLICKS_MODELS = sorted(CLICKS_MODELS,key= lambda a: 0 - datetime.strptime(a[2],"%Y-%m-%d %H:%M:%S.%f").timestamp())
 
 
 refresh_model_list()

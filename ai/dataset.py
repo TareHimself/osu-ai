@@ -153,7 +153,7 @@ class OsuDataset(torch.utils.data.Dataset):
 
             if not self.force_rebuild and path.exists(processed_data_path):
                 loaded_data = np.load(processed_data_path, allow_pickle=True)
-                return list(loaded_data[:, 0]), list(loaded_data[:, self.label_index])
+                return list(loaded_data[:, 0]),list(loaded_data[:, 1]),list(loaded_data[:, 2])
 
             files = self.extract_and_resize(
                 dataset, raw_data_path)
@@ -203,7 +203,7 @@ class OsuDataset(torch.utils.data.Dataset):
             print(f"Saving Dataset [{dataset[:-4]}]")
             np.save(processed_data_path, processed)
 
-            return list(processed[:, 0]), list(processed[:, self.label_index])
+            return list(processed[:, 0]), list(processed[:, 1]),list(processed[:, 2])
         except Exception as e:
 
             self.data_to_process.put(None)
@@ -216,15 +216,23 @@ class OsuDataset(torch.utils.data.Dataset):
         try:
             self.labels = []
             self.images = []
+            total_images = []
+            total_mouse_coords = []
+            total_keys = []
             with TemporaryDirectory() as temp_dir:
                 self.temp_dir = temp_dir
                 for dataset in self.datasets:
-                    images_created, labels_created = self.get_or_create_dataset(
+                    images,keys,coords = self.get_or_create_dataset(
                         temp_dir, dataset)
-                    self.images.extend(images_created)
-                    self.labels.extend(labels_created)
+                    total_images.extend(images)
+                    total_mouse_coords.extend(coords)
+                    total_keys.extend(keys)
 
             if self.label_index == OsuDataset.LABEL_TYPE_ACTIONS:
+                total_mouse_coords = []
+                self.images = total_images
+                self.labels = total_keys
+
                 unique_labels = list(set(self.labels))
                 counts = {}
                 for label in unique_labels:
@@ -251,7 +259,18 @@ class OsuDataset(torch.utils.data.Dataset):
                 for label in self.labels:
                     counts[label] += 1
 
-                print("Final Data Balance", counts)
+                print("Final Dataset Balance", counts)
+            else:
+                # for i in tqdm(range(len(total_keys)),desc="Filtering out useless data"):
+                #     if total_keys[i] != 0:
+                #         self.labels.append(total_mouse_coords[i])
+                #         self.images.append(total_images[i])
+                # total_images = []
+                # total_keys = []
+                # total_mouse_coords = []
+                self.images = total_images
+                self.labels = total_mouse_coords
+                print("Final Dataset Size",len(self.labels))
 
         except Exception as e:
             print(traceback.format_exc())
