@@ -1,6 +1,6 @@
-import time
-from ai.eval import AimThread, ActionsThread
-from utils import FixedRuntime, OsuSocketServer
+from ai.eval import AimThread
+from ai.utils import FixedRuntime
+
 AI = AimThread(
     model_id=f'D:\Github\osu-ai\models\model_aim_body floating_20-02-23-19-58-01.pt')
 # AC = ActionsThread(

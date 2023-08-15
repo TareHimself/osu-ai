@@ -1,3 +1,4 @@
+import os.path
 import time
 import cv2
 import numpy as np
@@ -5,15 +6,16 @@ import torch
 import keyboard
 import win32api
 from threading import Thread
-from torch.nn import Module
 from torch import Tensor
-from ai.models import ActionsNet, AimNet, OsuAiModel
-from constants import FINAL_RESIZE_PERCENT, FRAME_DELAY, PLAY_AREA_CAPTURE_PARAMS, PYTORCH_DEVICE,PLAY_AREA_INDICES
-from utils import FixedRuntime
+from ai.models import ActionsNet, AimNet, OsuAiModel, CombinedNet
+from ai.constants import FINAL_PLAY_AREA_SIZE, FRAME_DELAY, PYTORCH_DEVICE, MODELS_DIR
+from ai.utils import FixedRuntime, derive_capture_params
 from collections import deque
 from mss import mss
-#'osu!'  #
-DEFAULT_OSU_WINDOW = 'osu!'  #"osu! (development)"
+from ai.enums import EPlayAreaIndices
+
+# 'osu!'  #
+DEFAULT_OSU_WINDOW = 'osu!'  # "osu! (development)"
 
 
 class EvalThread(Thread):
@@ -22,12 +24,18 @@ class EvalThread(Thread):
         super().__init__(group=None, daemon=True)
         self.game_window_name = game_window_name
         self.model_id = model_id
+        self.capture_params = derive_capture_params()
         self.eval_key = eval_key
         self.eval = True
         self.start()
 
-    def get_model(self, model_id: str) -> OsuAiModel:
-        pass
+
+    def get_model(self):
+        model = torch.jit.load(os.path.join(MODELS_DIR, self.model_id, 'model.pt'))
+        model.load_state_dict(torch.load(os.path.join(MODELS_DIR, self.model_id, 'weights.pt')))
+        model.to(PYTORCH_DEVICE)
+        model.eval()
+        return model
 
     def on_output(self, output: Tensor):
         pass
@@ -40,8 +48,7 @@ class EvalThread(Thread):
 
     @torch.no_grad()
     def run(self):
-        eval_model = self.get_model(self.model_id).to(PYTORCH_DEVICE)
-        eval_model.eval()
+        eval_model = self.get_model()
         with torch.inference_mode():
             frame_buffer = deque(maxlen=eval_model.channels)
             eval_this_frame = False
@@ -53,42 +60,43 @@ class EvalThread(Thread):
             keyboard.add_hotkey(self.eval_key, callback=toggle_eval)
 
             self.on_eval_ready()
-            with torch.inference_mode():
-                with mss() as sct:
-                    monitor = monitor = {"top": PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.Y_OFFSET], "left": PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.X_OFFSET], "width": PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.WIDTH], "height": PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.HEIGHT]}
-                    
-                    while self.eval:
-                        with FixedRuntime(target_time=FRAME_DELAY): # limit capture to every "FRAME_DELAY" seconds
-                            if eval_this_frame:
-                                frame = np.array(sct.grab(monitor))
-                                frame = cv2.resize(cv2.cvtColor(frame,cv2.COLOR_RGB2GRAY),(int(PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.WIDTH] * FINAL_RESIZE_PERCENT), int(
-                                        PLAY_AREA_CAPTURE_PARAMS[PLAY_AREA_INDICES.HEIGHT] * FINAL_RESIZE_PERCENT)))
 
-                                needed = eval_model.channels - len(frame_buffer)
+            print(self.capture_params)
+            with mss() as sct:
+                monitor = {"top": self.capture_params[EPlayAreaIndices.OffsetY.value],
+                           "left": self.capture_params[EPlayAreaIndices.OffsetX.value],
+                           "width": self.capture_params[EPlayAreaIndices.Width.value],
+                           "height": self.capture_params[EPlayAreaIndices.Height.value]}
 
-                                if needed > 0:
-                                    for i in range(needed):
-                                        frame_buffer.append(frame)
-                                else:
+                while self.eval:
+                    with FixedRuntime(target_time=FRAME_DELAY):  # limit capture to every "FRAME_DELAY" seconds
+                        if eval_this_frame:
+                            frame = np.array(sct.grab(monitor))
+                            frame = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY), FINAL_PLAY_AREA_SIZE)
+
+                            needed = eval_model.channels - len(frame_buffer)
+
+                            if needed > 0:
+                                for i in range(needed):
                                     frame_buffer.append(frame)
-
-                                stacked = np.stack(frame_buffer)
-
-                                start = time.time()
+                            else:
                                 frame_buffer.append(frame)
-                                # cv2.imshow("Debug", stacked.transpose(1, 2, 0))
-                                # cv2.waitKey(1)
 
-                                converted_frame = torch.from_numpy(stacked / 255).type(
-                                    torch.FloatTensor).to(PYTORCH_DEVICE)
+                            stacked = np.stack(frame_buffer)
 
-                                inputs = converted_frame.reshape(
-                                    (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
+                            frame_buffer.append(frame)
+                            cv2.imshow("Debug", stacked[0:3].transpose(1, 2, 0))
+                            cv2.waitKey(1)
 
-                                out: torch.Tensor = eval_model(inputs)
-                                self.on_output(out.detach())
-                                end = time.time() - start
-                                # print(f"Delay {end}") # debug capture speed
+                            converted_frame = torch.from_numpy(stacked / 255).type(
+                                torch.FloatTensor).to(PYTORCH_DEVICE)
+
+                            inputs = converted_frame.reshape(
+                                (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
+
+                            out: torch.Tensor = eval_model(inputs)
+
+                            self.on_output(out.detach())
 
             keyboard.remove_hotkey(toggle_eval)
 
@@ -100,11 +108,9 @@ class ActionsThread(EvalThread):
         2: "Button 2"
     }
 
-    def __init__(self,  model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
+    def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
         super().__init__(model_id, game_window_name, eval_key)
 
-    def get_model(self, model_id: str) -> OsuAiModel:
-        return ActionsNet.load(model_id)
 
     def on_eval_ready(self):
         print(f"Actions Model Ready,Press '{self.eval_key}' To Toggle")
@@ -127,18 +133,50 @@ class ActionsThread(EvalThread):
 
 
 class AimThread(EvalThread):
-    def __init__(self,  model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
+    def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
         super().__init__(model_id, game_window_name, eval_key)
 
-
-    def get_model(self, model_id: str) -> OsuAiModel:
-        return AimNet.load(model_id)
-
+    # def get_model(self):
+    #     # model = torch.jit.load(os.path.join(MODELS_DIR, self.model_id, 'model.pt'))
+    #     # model.load_state_dict(torch.load(os.path.join(MODELS_DIR, self.model_id, 'weights.pt')))
+    #     model = AimNet.load(self.model_id)
+    #     model.to(PYTORCH_DEVICE)
+    #     model.eval()
+    #     return model
+    
     def on_eval_ready(self):
         print(f"Aim Model Ready,Press '{self.eval_key}' To Toggle")
 
     def on_output(self, output: Tensor):
         mouse_x_percent, mouse_y_percent = output[0]
-        position = (int((mouse_x_percent * PLAY_AREA_CAPTURE_PARAMS[0]) + PLAY_AREA_CAPTURE_PARAMS[2]), int(
-            (mouse_y_percent * PLAY_AREA_CAPTURE_PARAMS[1]) + PLAY_AREA_CAPTURE_PARAMS[3]))
+        position = (int((mouse_x_percent * self.capture_params[EPlayAreaIndices.Width.value]) + self.capture_params[
+            EPlayAreaIndices.OffsetX.value]), int(
+            (mouse_y_percent * self.capture_params[EPlayAreaIndices.Height.value]) + self.capture_params[
+                EPlayAreaIndices.OffsetY.value]))
         win32api.SetCursorPos(position)
+
+
+class CombinedThread(EvalThread):
+    def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
+        super().__init__(model_id, game_window_name, eval_key)
+
+    def on_eval_ready(self):
+        print(f"Combined Model Ready,Press '{self.eval_key}' To Toggle")
+
+    def on_output(self, output: Tensor):
+        mouse_x_percent, mouse_y_percent, k1_prob, k2_prob = output[0]
+        position = (int((mouse_x_percent * self.capture_params[EPlayAreaIndices.Width.value]) + self.capture_params[
+            EPlayAreaIndices.OffsetX.value]), int(
+            (mouse_y_percent * self.capture_params[EPlayAreaIndices.Height.value]) + self.capture_params[
+                EPlayAreaIndices.OffsetY.value]))
+        win32api.SetCursorPos(position)
+
+        if k1_prob >= 0.5:
+            keyboard.press('z')
+        else:
+            keyboard.release('z')
+
+        if k2_prob >= 0.5:
+            keyboard.press('x')
+        else:
+            keyboard.release('x')

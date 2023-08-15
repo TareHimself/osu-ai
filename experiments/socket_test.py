@@ -1,11 +1,7 @@
-
-import socket
 import time
-from threading import Thread
-import uuid
 import asyncio
 
-from utils import OsuSocketServer
+from ai.utils import OsuSocketServer
 
 server = OsuSocketServer()
 while True:

@@ -1,4 +1,4 @@
-from constants import PLAY_AREA_CAPTURE_PARAMS, FINAL_RESIZE_PERCENT, PYTORCH_DEVICE
+from ai.constants import PLAY_AREA_CAPTURE_PARAMS
 import numpy as np
 import win32gui
 import win32ui

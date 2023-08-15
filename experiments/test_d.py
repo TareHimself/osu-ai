@@ -1,9 +1,5 @@
 import cv2
 import os
-import time
-import traceback
-from utils import ScreenRecorder
-from windows import WindowCapture
 
 # try:
 #     with ScreenRecorder(20) as s:

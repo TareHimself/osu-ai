@@ -1,9 +1,4 @@
-import cv2
 import os
-import time
-import traceback
-from utils import ScreenRecorder
-from windows import WindowCapture
 import zipfile
 from tqdm import tqdm
 

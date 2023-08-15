@@ -1,8 +1,7 @@
 
-
 if __name__ == '__main__':
 
-    from utils import get_validated_input
+    from ai.utils import get_validated_input
 
     USER_MAIN_MENU = """What would you like to do ?
     [0] Train or finetune a model

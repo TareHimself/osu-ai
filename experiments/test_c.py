@@ -1,7 +1,6 @@
 from windows import WindowCapture
-import time
 import cv2
-from utils import FixedRuntime
+from ai.utils import FixedRuntime
 from collections import deque
 cap = WindowCapture()
 previous = deque(maxlen=3)

@@ -1,10 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch import optim
-from torchvision.models import resnet18, ResNet18_Weights, resnet50, ResNet50_Weights
-from constants import PYTORCH_DEVICE
-from rl.memory import ReplayMemory
 
 
 class DQN(torch.nn.Module):
