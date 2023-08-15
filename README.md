@@ -4,7 +4,7 @@
 
 ## Info
 
-- Data extracted from replays produced by a slightly modified version of [danser-go](https://github.com/Wieku/danser-go)
+- Data extracted from replays produced by a slightly modified version of [danser-go](https://github.com/TareHimself/danser-go)
 
 - Aiming works but clicking does not.
 
