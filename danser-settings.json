@@ -1,0 +1,664 @@
+{
+	"General": {
+		"OsuSongsDir": "C:\\Users\\Taree\\AppData\\Local\\osu!\\Songs",
+		"OsuSkinsDir": "C:\\Users\\Taree\\AppData\\Local\\osu!\\Skins",
+		"OsuReplaysDir": "C:\\Users\\Taree\\AppData\\Local\\osu!\\Replays",
+		"DiscordPresenceOn": true,
+		"UnpackOszFiles": true,
+		"VerboseImportLogs": false
+	},
+	"Graphics": {
+		"Width": 1920,
+		"Height": 1080,
+		"WindowWidth": 1440,
+		"WindowHeight": 810,
+		"Fullscreen": true,
+		"VSync": false,
+		"FPSCap": 0,
+		"MSAA": 0,
+		"ShowFPS": true,
+		"Experimental": {
+			"UsePersistentBuffers": false
+		}
+	},
+	"Audio": {
+		"GeneralVolume": 0.5,
+		"MusicVolume": 0.5,
+		"SampleVolume": 0.5,
+		"Offset": 0,
+		"HitsoundPositionMultiplier": 1,
+		"IgnoreBeatmapSamples": true,
+		"IgnoreBeatmapSampleVolume": false,
+		"PlayNightcoreSamples": true,
+		"BeatScale": 1.2,
+		"BeatUseTimingPoints": false,
+		"Linux/Unix": {
+			"BassPlaybackBufferLength": 100,
+			"BassDeviceBufferLength": 10,
+			"BassUpdatePeriod": 5,
+			"BassDeviceUpdatePeriod": 10
+		}
+	},
+	"Input": {
+		"LeftKey": "Z",
+		"RightKey": "X",
+		"RestartKey": "`",
+		"SmokeKey": "C",
+		"ScreenshotKey": "F2",
+		"MouseButtonsDisabled": true,
+		"MouseHighPrecision": false,
+		"MouseSensitivity": 1
+	},
+	"Gameplay": {
+		"HitErrorMeter": {
+			"Show": false,
+			"Scale": 1,
+			"Opacity": 1,
+			"XOffset": 0,
+			"YOffset": 0,
+			"PointFadeOutTime": 10,
+			"ShowPositionalMisses": true,
+			"PositionalMissScale": 1.5,
+			"ShowUnstableRate": true,
+			"UnstableRateDecimals": 0,
+			"UnstableRateScale": 1,
+			"StaticUnstableRate": false,
+			"ScaleWithSpeed": false
+		},
+		"AimErrorMeter": {
+			"Show": false,
+			"Scale": 1,
+			"Opacity": 1,
+			"XPosition": 1350,
+			"YPosition": 650,
+			"PointFadeOutTime": 10,
+			"DotScale": 1,
+			"Align": "Right",
+			"ShowUnstableRate": false,
+			"UnstableRateScale": 1,
+			"UnstableRateDecimals": 0,
+			"StaticUnstableRate": false,
+			"CapPositionalMisses": true,
+			"AngleNormalized": false
+		},
+		"Score": {
+			"Show": true,
+			"Scale": 1,
+			"Opacity": 1,
+			"XOffset": 0,
+			"YOffset": 0,
+			"ProgressBar": "Pie",
+			"ShowGradeAlways": false,
+			"StaticScore": false,
+			"StaticAccuracy": false
+		},
+		"HpBar": {
+			"Show": true,
+			"Scale": 1,
+			"Opacity": 1,
+			"XOffset": 0,
+			"YOffset": 0
+		},
+		"ComboCounter": {
+			"Show": true,
+			"Scale": 1,
+			"Opacity": 1,
+			"XOffset": 0,
+			"YOffset": 0,
+			"Static": false
+		},
+		"PPCounter": {
+			"Show": false,
+			"Scale": 1,
+			"Opacity": 1,
+			"XPosition": 5,
+			"YPosition": 150,
+			"Color": {
+				"Hue": 0,
+				"Saturation": 0,
+				"Value": 1
+			},
+			"Decimals": 0,
+			"Align": "CentreLeft",
+			"ShowInResults": true,
+			"ShowPPComponents": false,
+			"Static": false
+		},
+		"HitCounter": {
+			"Show": false,
+			"Scale": 1,
+			"Opacity": 1,
+			"XPosition": 5,
+			"YPosition": 190,
+			"Color300": {
+				"Hue": 0,
+				"Saturation": 0,
+				"Value": 1
+			},
+			"Color100": {
+				"Hue": 0,
+				"Saturation": 0,
+				"Value": 1
+			},
+			"Color50": {
+				"Hue": 0,
+				"Saturation": 0,
+				"Value": 1
+			},
+			"ColorMiss": {
+				"Hue": 0,
+				"Saturation": 0,
+				"Value": 1
+			},
+			"ColorSB": {
+				"Hue": 0,
+				"Saturation": 0,
+				"Value": 1
+			},
+			"Spacing": 48,
+			"FontScale": 1,
+			"Align": "Left",
+			"ValueAlign": "Left",
+			"Vertical": false,
+			"Show300": false,
+			"ShowSliderBreaks": false
+		},
+		"StrainGraph": {
+			"Show": false,
+			"Opacity": 1,
+			"XPosition": 5,
+			"YPosition": 310,
+			"Align": "BottomLeft",
+			"Width": 130,
+			"Height": 70,
+			"BgColor": {
+				"Hue": 0,
+				"Saturation": 0,
+				"Value": 0.2
+			},
+			"FgColor": {
+				"Hue": 297,
+				"Saturation": 0.4,
+				"Value": 0.92
+			},
+			"Outline": {
+				"Show": false,
+				"Width": 2,
+				"InnerDarkness": 0.5,
+				"InnerOpacity": 0.5
+			}
+		},
+		"KeyOverlay": {
+			"Show": true,
+			"Scale": 1,
+			"Opacity": 1,
+			"XOffset": 0,
+			"YOffset": 0
+		},
+		"ScoreBoard": {
+			"Show": false,
+			"Scale": 1,
+			"Opacity": 1,
+			"XOffset": 0,
+			"YOffset": 0,
+			"ModsOnly": false,
+			"AlignRight": false,
+			"HideOthers": false,
+			"ShowAvatars": false,
+			"ExplosionScale": 1
+		},
+		"Mods": {
+			"Show": false,
+			"Scale": 1,
+			"Opacity": 1,
+			"XOffset": 0,
+			"YOffset": 0,
+			"HideInReplays": false,
+			"FoldInReplays": false,
+			"AdditionalSpacing": 0
+		},
+		"Boundaries": {
+			"Enabled": false,
+			"BorderThickness": 1,
+			"BorderFill": 1,
+			"BorderColor": {
+				"Hue": 0,
+				"Saturation": 0,
+				"Value": 1
+			},
+			"BorderOpacity": 1,
+			"BackgroundColor": {
+				"Hue": 0,
+				"Saturation": 1,
+				"Value": 0
+			},
+			"BackgroundOpacity": 0.5
+		},
+		"Underlay": {
+			"Path": "",
+			"AboveHpBar": false
+		},
+		"HUDFont": "",
+		"ShowResultsScreen": true,
+		"ResultsScreenTime": 5,
+		"ResultsUseLocalTimeZone": false,
+		"ShowWarningArrows": true,
+		"ShowHitLighting": false,
+		"FlashlightDim": 1,
+		"PlayUsername": "Guest",
+		"IgnoreFailsInReplays": false,
+		"UseLazerPP": false
+	},
+	"Skin": {
+		"CurrentSkin": "Moonshine 2.0 [DT]",
+		"FallbackSkin": "Moonshine 2.0 [DT]",
+		"UseColorsFromSkin": true,
+		"UseBeatmapColors": false,
+		"Cursor": {
+			"UseSkinCursor": true,
+			"Scale": 0,
+			"TrailScale": 0,
+			"ForceLongTrail": false,
+			"LongTrailLength": 2048,
+			"LongTrailDensity": 1
+		}
+	},
+	"Cursor": {
+		"TrailStyle": 1,
+		"Style23Speed": 0.18,
+		"Style4Shift": 0.5,
+		"Colors": {
+			"EnableRainbow": false,
+			"RainbowSpeed": 8,
+			"BaseColor": {
+				"Hue": 0,
+				"Saturation": 1,
+				"Value": 1
+			},
+			"EnableCustomHueOffset": false,
+			"HueOffset": 0,
+			"FlashToTheBeat": false,
+			"FlashAmplitude": 0
+		},
+		"EnableCustomTagColorOffset": true,
+		"TagColorOffset": -36,
+		"EnableTrailGlow": true,
+		"EnableCustomTrailGlowOffset": true,
+		"TrailGlowOffset": -36,
+		"ScaleToCS": false,
+		"CursorSize": 12,
+		"CursorExpand": false,
+		"ScaleToTheBeat": false,
+		"ShowCursorsOnBreaks": true,
+		"BounceOnEdges": false,
+		"TrailScale": 1,
+		"TrailEndScale": 0.4,
+		"TrailDensity": 1,
+		"TrailMaxLength": 2000,
+		"TrailRemoveSpeed": 1,
+		"GlowEndScale": 0.4,
+		"InnerLengthMult": 0.9,
+		"AdditiveBlending": true,
+		"CursorRipples": true,
+		"SmokeEnabled": true
+	},
+	"Objects": {
+		"DrawApproachCircles": true,
+		"DrawComboNumbers": true,
+		"DrawFollowPoints": true,
+		"LoadSpinners": true,
+		"ScaleToTheBeat": false,
+		"StackEnabled": true,
+		"Sliders": {
+			"ForceSliderBallTexture": true,
+			"DrawEndCircles": true,
+			"DrawSliderFollowCircle": true,
+			"DrawScorePoints": true,
+			"SliderMerge": false,
+			"BorderWidth": 1,
+			"Distortions": {
+				"Enabled": false,
+				"ViewportSize": 0,
+				"UseCustomResolution": false,
+				"CustomResolutionX": 1920,
+				"CustomResolutionY": 1080
+			},
+			"Snaking": {
+				"In": false,
+				"Out": false,
+				"OutFadeInstant": true,
+				"DurationMultiplier": 0,
+				"FadeMultiplier": 0
+			}
+		},
+		"Colors": {
+			"MandalaTexturesTrigger": 5,
+			"MandalaTexturesAlpha": 0.3,
+			"Color": {
+				"EnableRainbow": false,
+				"RainbowSpeed": 8,
+				"BaseColor": {
+					"Hue": 0,
+					"Saturation": 1,
+					"Value": 1
+				},
+				"EnableCustomHueOffset": false,
+				"HueOffset": 0,
+				"FlashToTheBeat": false,
+				"FlashAmplitude": 100
+			},
+			"UseComboColors": false,
+			"ComboColors": [
+				{
+					"Hue": 0,
+					"Saturation": 1,
+					"Value": 1
+				}
+			],
+			"UseSkinComboColors": false,
+			"UseBeatmapComboColors": false,
+			"Sliders": {
+				"WhiteScorePoints": false,
+				"ScorePointColorOffset": 0,
+				"SliderBallTint": false,
+				"Border": {
+					"UseHitCircleColor": false,
+					"Color": {
+						"EnableRainbow": false,
+						"RainbowSpeed": 8,
+						"BaseColor": {
+							"Hue": 0,
+							"Saturation": 0,
+							"Value": 1
+						},
+						"EnableCustomHueOffset": false,
+						"HueOffset": 0,
+						"FlashToTheBeat": false,
+						"FlashAmplitude": 100
+					},
+					"EnableCustomGradientOffset": false,
+					"CustomGradientOffset": 0
+				},
+				"Body": {
+					"UseHitCircleColor": false,
+					"Color": {
+						"EnableRainbow": false,
+						"RainbowSpeed": 8,
+						"BaseColor": {
+							"Hue": 0,
+							"Saturation": 1,
+							"Value": 0
+						},
+						"EnableCustomHueOffset": false,
+						"HueOffset": 0,
+						"FlashToTheBeat": false,
+						"FlashAmplitude": 100
+					},
+					"InnerOffset": -0.5,
+					"OuterOffset": -0.05,
+					"InnerAlpha": 0.8,
+					"OuterAlpha": 0.8
+				}
+			}
+		}
+	},
+	"Playfield": {
+		"DrawObjects": true,
+		"DrawCursors": true,
+		"Scale": 1,
+		"OsuShift": false,
+		"ShiftX": 0,
+		"ShiftY": 0,
+		"ScaleStoryboardWithPlayfield": false,
+		"MoveStoryboardWithPlayfield": false,
+		"LeadInTime": 0,
+		"LeadInHold": 0,
+		"FadeOutTime": 0,
+		"SeizureWarning": {
+			"Enabled": false,
+			"Duration": 5
+		},
+		"Background": {
+			"LoadStoryboards": true,
+			"LoadVideos": false,
+			"FlashToTheBeat": false,
+			"Dim": {
+				"Intro": 1,
+				"Normal": 1,
+				"Breaks": 0.5
+			},
+			"Parallax": {
+				"Enabled": false,
+				"Amount": 0.1,
+				"Speed": 0.5
+			},
+			"Blur": {
+				"Enabled": false,
+				"Values": {
+					"Intro": 0,
+					"Normal": 0.6,
+					"Breaks": 0.3
+				}
+			},
+			"Triangles": {
+				"Enabled": false,
+				"Shadowed": true,
+				"DrawOverBlur": true,
+				"ParallaxMultiplier": 0.5,
+				"Density": 1,
+				"Scale": 1,
+				"Speed": 1
+			}
+		},
+		"Logo": {
+			"Enabled": false,
+			"DrawSpectrum": false,
+			"Dim": {
+				"Intro": 0,
+				"Normal": 1,
+				"Breaks": 1
+			}
+		},
+		"Bloom": {
+			"Enabled": false,
+			"BloomToTheBeat": true,
+			"BloomBeatAddition": 0.3,
+			"Threshold": 0,
+			"Blur": 0.6,
+			"Power": 0.7
+		}
+	},
+	"CursorDance": {
+		"Movers": [
+			{
+				"Mover": "linear",
+				"SliderDance": false,
+				"RandomSliderDance": false
+			}
+		],
+		"Spinners": [
+			{
+				"Mover": "circle",
+				"CenterOffsetX": 0,
+				"CenterOffsetY": 0,
+				"Radius": 100
+			}
+		],
+		"ComboTag": false,
+		"Battle": false,
+		"DoSpinnersTogether": true,
+		"TAGSliderDance": false,
+		"MoverSettings": {
+			"Bezier": [
+				{
+					"Aggressiveness": 60,
+					"SliderAggressiveness": 3
+				}
+			],
+			"Flower": [
+				{
+					"AngleOffset": 90,
+					"DistanceMult": 0.666,
+					"StreamAngleOffset": 90,
+					"LongJump": -1,
+					"LongJumpMult": 0.7,
+					"LongJumpOnEqualPos": false
+				}
+			],
+			"HalfCircle": [
+				{
+					"RadiusMultiplier": 1,
+					"StreamTrigger": 130
+				}
+			],
+			"Spline": [
+				{
+					"RotationalForce": false,
+					"StreamHalfCircle": true,
+					"StreamWobble": true,
+					"WobbleScale": 0.67
+				}
+			],
+			"Momentum": [
+				{
+					"SkipStackAngles": false,
+					"StreamRestrict": true,
+					"DurationMult": 2,
+					"DurationTrigger": 500,
+					"StreamMult": 0.7,
+					"RestrictAngle": 90,
+					"RestrictArea": 40,
+					"RestrictInvert": true,
+					"DistanceMult": 0.6,
+					"DistanceMultOut": 0.45
+				}
+			],
+			"ExGon": [
+				{
+					"Delay": 50
+				}
+			],
+			"Linear": [
+				{
+					"WaitForPreempt": true,
+					"ReactionTime": 100,
+					"ChoppyLongObjects": false
+				}
+			],
+			"Pippi": [
+				{
+					"RotationSpeed": 1.6,
+					"RadiusMultiplier": 0.98,
+					"SpinnerRadius": 100
+				}
+			]
+		}
+	},
+	"Knockout": {
+		"Mode": 0,
+		"GraceEndTime": -10,
+		"BubbleMinimumCombo": 200,
+		"ExcludeMods": "",
+		"HideMods": "",
+		"MaxPlayers": 50,
+		"MinPlayers": 1,
+		"RevivePlayersAtEnd": false,
+		"LiveSort": true,
+		"SortBy": "Score",
+		"HideOverlayOnBreaks": false,
+		"MinCursorSize": 3,
+		"MaxCursorSize": 7,
+		"AddDanser": false,
+		"DanserName": "danser"
+	},
+	"Recording": {
+		"FrameWidth": 1920,
+		"FrameHeight": 1080,
+		"FPS": 100,
+		"EncodingFPSCap": 0,
+		"Encoder": "hevc_nvenc",
+		"libx264": {
+			"RateControl": "crf",
+			"Bitrate": "10M",
+			"CRF": 14,
+			"Profile": "high",
+			"Preset": "faster",
+			"AdditionalOptions": ""
+		},
+		"libx265": {
+			"RateControl": "crf",
+			"Bitrate": "10M",
+			"CRF": 18,
+			"Preset": "fast",
+			"AdditionalOptions": ""
+		},
+		"h264_nvenc": {
+			"RateControl": "cq",
+			"Bitrate": "10M",
+			"CQ": 22,
+			"Profile": "high",
+			"Preset": "p7",
+			"AdditionalOptions": ""
+		},
+		"hevc_nvenc": {
+			"RateControl": "cq",
+			"Bitrate": "10M",
+			"CQ": 24,
+			"Preset": "p1",
+			"AdditionalOptions": ""
+		},
+		"h264_qsv": {
+			"RateControl": "icq",
+			"Bitrate": "10M",
+			"Quality": 15,
+			"Profile": "high",
+			"Preset": "slow",
+			"AdditionalOptions": ""
+		},
+		"hevc_qsv": {
+			"RateControl": "icq",
+			"Bitrate": "10M",
+			"Quality": 20,
+			"Preset": "slow",
+			"AdditionalOptions": ""
+		},
+		"custom": {
+			"CustomOptions": ""
+		},
+		"PixelFormat": "yuv420p",
+		"Filters": "",
+		"AudioCodec": "aac",
+		"aac": {
+			"Bitrate": "192k",
+			"AdditionalOptions": ""
+		},
+		"libmp3lame": {
+			"RateControl": "abr",
+			"TargetBitrate": "192k",
+			"AdditionalOptions": ""
+		},
+		"libopus": {
+			"RateControl": "vbr",
+			"TargetBitrate": "192k",
+			"AdditionalOptions": ""
+		},
+		"flac": {
+			"CompressionLevel": 12,
+			"AdditionalOptions": ""
+		},
+		"customAudio": {
+			"CustomOptions": ""
+		},
+		"AudioFilters": "",
+		"OutputDir": "videos",
+		"Container": "mkv",
+		"ShowFFmpegLogs": true,
+		"MotionBlur": {
+			"Enabled": false,
+			"OversampleMultiplier": 16,
+			"BlendFrames": 24,
+			"BlendFunctionID": 27,
+			"GaussWeightsMult": 1.5
+		}
+	}
+}
