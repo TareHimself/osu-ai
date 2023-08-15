@@ -1,11 +1,9 @@
-import gymnasium
 import time
 import torch
 import numpy as np
 import random
 from torch import optim, nn
-from gymnasium import spaces
-from constants import PLAY_AREA_CAPTURE_PARAMS, FINAL_RESIZE_PERCENT, PYTORCH_DEVICE
+from ai.constants import PLAY_AREA_CAPTURE_PARAMS, FINAL_RESIZE_PERCENT, PYTORCH_DEVICE
 from rl.agent import OsuAgent
 from collections import deque
 from rl.dqn import DQN

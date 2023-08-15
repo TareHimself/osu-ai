@@ -1,3 +1,9 @@
 {
-	"editor.detectIndentation": false
+    "editor.detectIndentation": false,
+    "python.analysis.typeCheckingMode": "off",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true
 }

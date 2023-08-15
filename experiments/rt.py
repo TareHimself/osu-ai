@@ -5,7 +5,7 @@ observation, info = env.reset()
 
 for _ in range(1000):
     # agent policy that uses the observation and info
-    action = env.action_space.sample()
+    action = env.action_space.sample_mouse()
     observation, reward, terminated, truncated, info = env.step(action)
 
     if terminated or truncated:

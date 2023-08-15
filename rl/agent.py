@@ -6,13 +6,11 @@ import asyncio
 import cv2
 import keyboard
 import time
-import pygame
 from queue import Queue
 from torchvision import transforms
-from utils import OsuSocketServer
-from collections import deque
+from ai.utils import OsuSocketServer
 from threading import Thread
-from constants import PLAY_AREA_CAPTURE_PARAMS, FINAL_RESIZE_PERCENT, PYTORCH_DEVICE
+from ai.constants import PLAY_AREA_CAPTURE_PARAMS, FINAL_RESIZE_PERCENT
 
 ConvertToTensor = transforms.ToTensor()
 

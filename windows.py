@@ -137,21 +137,4 @@ from queue import Queue
 #                 cv2.waitKey(1)
 
 
-def derive_capture_params(window_width=1920, window_height=1080, capture_height=1000):
-    osu_playfield_ratio = 3/4
 
-    capture_width = int(capture_height / osu_playfield_ratio)
-    capture_params = [capture_width, capture_height,
-                      int((window_width-capture_width)/2), int((window_height-(capture_height))/2)]
-
-    return capture_params
-
-
-def coordinates_to_playfield_percent(window_width=1920, window_height=1080, capture_height=1000):
-    osu_playfield_ratio = 3/4
-
-    capture_width = int(capture_height / osu_playfield_ratio)
-    capture_params = [capture_width, capture_height,
-                      int((window_width-capture_width)/2), int((window_height-(capture_height))/2)]
-
-    return capture_params

@@ -8,5 +8,5 @@ node_modules/*
 *.log
 node_modules
 pending-capture/*
-*.json
+
 *.mkv
