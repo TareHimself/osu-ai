@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "osu-ai"
+version = "0.1.0"
+description = ""
+authors = ["Tare Ebelo <75279482+TareHimself@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+keyboard= "^0.13.5"
+numpy= "^1.24.3"
+torch= "^2.0.1"
+torchvision= "^0.15.2"
+tqdm= "^4.64.1"
+opencv-python= "^4.7.0.72"
+mss= "^9.0.1"
+timm= "^0.9.2"
+mouse = "^0.7.1"
+
+[tool.poetry.dev-dependencies]
+poethepoet = "^0.20.0"
+
+[tool.poe.tasks]
+uninstall-torch = "pip uninstall -y torch torchvision"
+install-torch-cuda = "pip install torch torchvision --index-url https://download.pytorch.org/whl/cu117"
+build-ui = "npm install && npm run build"
+run-server = "python server.py"
+force-cuda = ["uninstall-torch","install-torch-cuda"]
+# install-torch-linux = "pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118"
+# install-torch-osx ="pip install torch torchvision"
+# torch-win = ["uninstall-torch","install-torch-win"]
+# torch-linux = ["uninstall-torch","install-torch-linux"]
+# torch-osx =["uninstall-torch","install-torch-osx"]
+
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
