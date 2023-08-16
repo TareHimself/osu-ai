@@ -257,6 +257,10 @@ def refresh_model_list():
     AIM_MODELS = []
     CLICKS_MODELS = []
     COMBINED_MODELS = []
+    if not os.path.exists(MODELS_DIR):
+        os.makedirs(MODELS_DIR)
+        return
+    
     for model_id in os.listdir(MODELS_DIR):
 
         model_path = os.path.join(MODELS_DIR, model_id)
