@@ -12,17 +12,20 @@ from ai.utils import FixedRuntime, derive_capture_params
 from collections import deque
 from mss import mss
 from ai.enums import EPlayAreaIndices
-import pyautogui
 import mouse
 # 'osu!'  #
 DEFAULT_OSU_WINDOW = 'osu!'  # "osu! (development)"
-
+USE_WIN_32_MOUSE = False
+try:
+    import win32api
+    USE_WIN_32_MOUSE = True
+except:
+    USE_WIN_32_MOUSE = False
 
 class EvalThread(Thread):
 
     def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
         super().__init__(group=None, daemon=True)
-        pyautogui.PAUSE = 0
         self.game_window_name = game_window_name
         self.model_id = model_id
         self.capture_params = derive_capture_params()
@@ -62,7 +65,6 @@ class EvalThread(Thread):
 
             self.on_eval_ready()
 
-            print(self.capture_params)
             with mss() as sct:
                 monitor = {"top": self.capture_params[EPlayAreaIndices.OffsetY.value],
                            "left": self.capture_params[EPlayAreaIndices.OffsetX.value],
@@ -134,9 +136,8 @@ class ActionsThread(EvalThread):
 
 
 class AimThread(EvalThread):
-    def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\',is_win32 = False):
+    def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
         super().__init__(model_id, game_window_name, eval_key)
-        self.is_win32 = is_win32
 
     # def get_model(self):
     #     # model = torch.jit.load(os.path.join(MODELS_DIR, self.model_id, 'model.pt'))
@@ -156,7 +157,7 @@ class AimThread(EvalThread):
             (mouse_y_percent * self.capture_params[EPlayAreaIndices.Height.value]) + self.capture_params[
                 EPlayAreaIndices.OffsetY.value]))
         # pyautogui.moveTo(position[0], position[1])
-        if self.is_win32:
+        if USE_WIN_32_MOUSE:
             import win32api
             win32api.SetCursorPos(position)
         else:
@@ -177,7 +178,11 @@ class CombinedThread(EvalThread):
             (mouse_y_percent * self.capture_params[EPlayAreaIndices.Height.value]) + self.capture_params[
                 EPlayAreaIndices.OffsetY.value]))
 
-        mouse.move(position[0],position[1])
+        if USE_WIN_32_MOUSE:
+            import win32api
+            win32api.SetCursorPos(position)
+        else:
+            mouse.move(position[0],position[1])
 
         if k1_prob >= 0.5:
             keyboard.press('z')

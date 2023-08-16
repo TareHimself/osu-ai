@@ -36,6 +36,7 @@ conda activate osu-ai
 ```bash
 poetry install
 # For cuda support run "poe force-cuda"
+# For win32Mouse support run "poe use-win32"
 ```
 - now we can run main
 ```bash
