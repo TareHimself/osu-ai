@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: ""
+authors:
+- family-names: "Ebelo"
+  given-names: "Oyintare"
+  orcid: "https://orcid.org/0009-0001-0044-5654"
+title: "osu-ai"
+version: 1.0.0
+doi: 10.5281/zenodo.10208110
+date-released: 2023-11-26
+url: "https://github.com/TareHimself/osu-ai"
