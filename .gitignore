@@ -11,3 +11,4 @@ pending-capture/*
 
 *.mkv
 *.lock
+*.json

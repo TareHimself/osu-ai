@@ -1,20 +1,17 @@
 import torch
 from os import getcwd, path, makedirs
 
-ASSETS_DIR = path.normpath(path.join(getcwd(), 'assets'))
-MODELS_DIR = path.normpath(path.join(
-    getcwd(), 'models'))
-RAW_DATA_DIR = path.normpath(path.join(
-    getcwd(), 'data', 'raw'))
-PROCESSED_DATA_DIR = path.normpath(path.join(
-    getcwd(), 'data', 'processed'))
+ASSETS_DIR = path.normpath(path.join(getcwd(), "assets"))
+MODELS_DIR = path.normpath(path.join(getcwd(), "models"))
+RAW_DATA_DIR = path.normpath(path.join(getcwd(), "data", "raw"))
+PROCESSED_DATA_DIR = path.normpath(path.join(getcwd(), "data", "processed"))
 
 CAPTURE_HEIGHT_PERCENT = 1.0
 
 
 PLAY_AREA_RATIO = 4 / 3
 
-FINAL_IMAGE_WIDTH = 80  # int(1920 * 0.1)
+FINAL_IMAGE_WIDTH = 96  # int(1920 * 0.1)
 # FINAL_IMAGE_WIDTH = 80
 FINAL_IMAGE_HEIGHT = int(FINAL_IMAGE_WIDTH / PLAY_AREA_RATIO)
 
@@ -22,7 +19,7 @@ FINAL_PLAY_AREA_SIZE = (FINAL_IMAGE_WIDTH, FINAL_IMAGE_HEIGHT)
 
 PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-CURRENT_STACK_NUM = 10
+CURRENT_STACK_NUM = 4
 
 FRAME_DELAY = 0.01
 

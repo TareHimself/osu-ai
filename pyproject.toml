@@ -23,7 +23,7 @@ poethepoet = "^0.20.0"
 
 [tool.poe.tasks]
 uninstall-torch = "pip uninstall -y torch torchvision"
-install-torch-cuda = "pip install torch torchvision --index-url https://download.pytorch.org/whl/cu117"
+install-torch-cuda = "pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118"
 force-cuda = ["uninstall-torch","install-torch-cuda"]
 use-win32 = "pip install pywin32"
 
