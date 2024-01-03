@@ -13,18 +13,25 @@ from collections import deque
 from mss import mss
 from ai.enums import EPlayAreaIndices
 import mouse
+
 # 'osu!'  #
-DEFAULT_OSU_WINDOW = 'osu!'  # "osu! (development)"
+DEFAULT_OSU_WINDOW = "osu!"  # "osu! (development)"
 USE_WIN_32_MOUSE = False
 try:
     import win32api
+
     USE_WIN_32_MOUSE = True
 except:
     USE_WIN_32_MOUSE = False
 
-class EvalThread(Thread):
 
-    def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
+class EvalThread(Thread):
+    def __init__(
+        self,
+        model_id: str,
+        game_window_name: str = DEFAULT_OSU_WINDOW,
+        eval_key: str = "\\",
+    ):
         super().__init__(group=None, daemon=True)
         self.game_window_name = game_window_name
         self.model_id = model_id
@@ -33,10 +40,13 @@ class EvalThread(Thread):
         self.eval = True
         self.start()
 
-
     def get_model(self):
-        model = torch.jit.load(os.path.join(MODELS_DIR, self.model_id, 'model.pt'))
-        model.load_state_dict(torch.load(os.path.join(MODELS_DIR, self.model_id, 'weights.pt')))
+        model = torch.jit.load(
+            os.path.join(MODELS_DIR, self.model_id, "all.torchscript")
+        )
+        model.load_state_dict(
+            torch.load(os.path.join(MODELS_DIR, self.model_id, "all.pt"))
+        )
         model.to(PYTORCH_DEVICE)
         model.eval()
         return model
@@ -66,16 +76,23 @@ class EvalThread(Thread):
             self.on_eval_ready()
 
             with mss() as sct:
-                monitor = {"top": self.capture_params[EPlayAreaIndices.OffsetY.value],
-                           "left": self.capture_params[EPlayAreaIndices.OffsetX.value],
-                           "width": self.capture_params[EPlayAreaIndices.Width.value],
-                           "height": self.capture_params[EPlayAreaIndices.Height.value]}
+                monitor = {
+                    "top": self.capture_params[EPlayAreaIndices.OffsetY.value],
+                    "left": self.capture_params[EPlayAreaIndices.OffsetX.value],
+                    "width": self.capture_params[EPlayAreaIndices.Width.value],
+                    "height": self.capture_params[EPlayAreaIndices.Height.value],
+                }
 
                 while self.eval:
-                    with FixedRuntime(target_time=FRAME_DELAY):  # limit capture to every "FRAME_DELAY" seconds
+                    with FixedRuntime(
+                        target_time=FRAME_DELAY
+                    ):  # limit capture to every "FRAME_DELAY" seconds
                         if eval_this_frame:
                             frame = np.array(sct.grab(monitor))
-                            frame = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY), FINAL_PLAY_AREA_SIZE)
+                            frame = cv2.resize(
+                                cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY),
+                                FINAL_PLAY_AREA_SIZE,
+                            )
 
                             needed = eval_model.channels - len(frame_buffer)
 
@@ -91,11 +108,20 @@ class EvalThread(Thread):
                             # cv2.imshow("Debug", stacked[0:3].transpose(1, 2, 0))
                             # cv2.waitKey(1)
 
-                            converted_frame = torch.from_numpy(stacked / 255).type(
-                                torch.FloatTensor).to(PYTORCH_DEVICE)
+                            converted_frame = (
+                                torch.from_numpy(stacked / 255)
+                                .type(torch.FloatTensor)
+                                .to(PYTORCH_DEVICE)
+                            )
 
                             inputs = converted_frame.reshape(
-                                (1, converted_frame.shape[0], converted_frame.shape[1], converted_frame.shape[2]))
+                                (
+                                    1,
+                                    converted_frame.shape[0],
+                                    converted_frame.shape[1],
+                                    converted_frame.shape[2],
+                                )
+                            )
 
                             out: torch.Tensor = eval_model(inputs)
 
@@ -105,15 +131,15 @@ class EvalThread(Thread):
 
 
 class ActionsThread(EvalThread):
-    KEYS_STATE_TO_STRING = {
-        0: "Idle    ",
-        1: "Button 1",
-        2: "Button 2"
-    }
+    KEYS_STATE_TO_STRING = {0: "Idle    ", 1: "Button 1", 2: "Button 2"}
 
-    def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
+    def __init__(
+        self,
+        model_id: str,
+        game_window_name: str = DEFAULT_OSU_WINDOW,
+        eval_key: str = "\\",
+    ):
         super().__init__(model_id, game_window_name, eval_key)
-
 
     def on_eval_ready(self):
         print(f"Actions Model Ready,Press '{self.eval_key}' To Toggle")
@@ -125,18 +151,23 @@ class ActionsThread(EvalThread):
         if prob.item() > 0:  # 0.7:
             state = predicated.item()
             if state == 0:
-                keyboard.release('x')
-                keyboard.release('z')
+                keyboard.release("x")
+                keyboard.release("z")
             elif state == 1:
-                keyboard.release('z')
-                keyboard.press('x')
+                keyboard.release("z")
+                keyboard.press("x")
             elif state == 2:
-                keyboard.release('x')
-                keyboard.press('z')
+                keyboard.release("x")
+                keyboard.press("z")
 
 
 class AimThread(EvalThread):
-    def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
+    def __init__(
+        self,
+        model_id: str,
+        game_window_name: str = DEFAULT_OSU_WINDOW,
+        eval_key: str = "\\",
+    ):
         super().__init__(model_id, game_window_name, eval_key)
 
     # def get_model(self):
@@ -146,26 +177,38 @@ class AimThread(EvalThread):
     #     model.to(PYTORCH_DEVICE)
     #     model.eval()
     #     return model
-    
+
     def on_eval_ready(self):
         print(f"Aim Model Ready,Press '{self.eval_key}' To Toggle")
 
     def on_output(self, output: Tensor):
         mouse_x_percent, mouse_y_percent = output[0]
-        position = (int((mouse_x_percent * self.capture_params[EPlayAreaIndices.Width.value]) + self.capture_params[
-            EPlayAreaIndices.OffsetX.value]), int(
-            (mouse_y_percent * self.capture_params[EPlayAreaIndices.Height.value]) + self.capture_params[
-                EPlayAreaIndices.OffsetY.value]))
+        position = (
+            int(
+                (mouse_x_percent * self.capture_params[EPlayAreaIndices.Width.value])
+                + self.capture_params[EPlayAreaIndices.OffsetX.value]
+            ),
+            int(
+                (mouse_y_percent * self.capture_params[EPlayAreaIndices.Height.value])
+                + self.capture_params[EPlayAreaIndices.OffsetY.value]
+            ),
+        )
         # pyautogui.moveTo(position[0], position[1])
         if USE_WIN_32_MOUSE:
             import win32api
+
             win32api.SetCursorPos(position)
         else:
-            mouse.move(position[0],position[1])
+            mouse.move(position[0], position[1])
 
 
 class CombinedThread(EvalThread):
-    def __init__(self, model_id: str, game_window_name: str = DEFAULT_OSU_WINDOW, eval_key: str = '\\'):
+    def __init__(
+        self,
+        model_id: str,
+        game_window_name: str = DEFAULT_OSU_WINDOW,
+        eval_key: str = "\\",
+    ):
         super().__init__(model_id, game_window_name, eval_key)
 
     def on_eval_ready(self):
@@ -173,23 +216,30 @@ class CombinedThread(EvalThread):
 
     def on_output(self, output: Tensor):
         mouse_x_percent, mouse_y_percent, k1_prob, k2_prob = output[0]
-        position = (int((mouse_x_percent * self.capture_params[EPlayAreaIndices.Width.value]) + self.capture_params[
-            EPlayAreaIndices.OffsetX.value]), int(
-            (mouse_y_percent * self.capture_params[EPlayAreaIndices.Height.value]) + self.capture_params[
-                EPlayAreaIndices.OffsetY.value]))
+        position = (
+            int(
+                (mouse_x_percent * self.capture_params[EPlayAreaIndices.Width.value])
+                + self.capture_params[EPlayAreaIndices.OffsetX.value]
+            ),
+            int(
+                (mouse_y_percent * self.capture_params[EPlayAreaIndices.Height.value])
+                + self.capture_params[EPlayAreaIndices.OffsetY.value]
+            ),
+        )
 
         if USE_WIN_32_MOUSE:
             import win32api
+
             win32api.SetCursorPos(position)
         else:
-            mouse.move(position[0],position[1])
+            mouse.move(position[0], position[1])
 
         if k1_prob >= 0.5:
-            keyboard.press('z')
+            keyboard.press("z")
         else:
-            keyboard.release('z')
+            keyboard.release("z")
 
         if k2_prob >= 0.5:
-            keyboard.press('x')
+            keyboard.press("x")
         else:
-            keyboard.release('x')
+            keyboard.release("x")

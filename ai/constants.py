@@ -1,6 +1,9 @@
 import torch
+import screeninfo
 from os import getcwd, path, makedirs
 
+SCREEN_WIDTH = screeninfo.get_monitors()[0].width
+SCREEN_HEIGHT = screeninfo.get_monitors()[0].height
 ASSETS_DIR = path.normpath(path.join(getcwd(), "assets"))
 MODELS_DIR = path.normpath(path.join(getcwd(), "models"))
 RAW_DATA_DIR = path.normpath(path.join(getcwd(), "data", "raw"))

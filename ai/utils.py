@@ -11,19 +11,24 @@ from socket import SHUT_RDWR
 from tempfile import TemporaryDirectory
 from threading import Thread, Timer, Event
 from datetime import datetime
-from ai.constants import RAW_DATA_DIR, MODELS_DIR,CAPTURE_HEIGHT_PERCENT
+from ai.constants import (
+    RAW_DATA_DIR,
+    MODELS_DIR,
+    CAPTURE_HEIGHT_PERCENT,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+)
 from mss import mss
 from queue import Queue
 from tqdm import tqdm
 from ai.enums import EModelType
-from typing import TypeVar, Callable, Union, TypeVar
-import math
+from typing import TypeVar, Callable, TypeVar
+import screeninfo
 import sys
 import subprocess
 
 
 class Cv2VideoContext:
-
     def __init__(self, file_path: str):
         # example file or database connection
         self.file_path = file_path
@@ -49,82 +54,93 @@ class EventsSamplerEventTypes:
 
 class EventsSampler:
     def __init__(self, events: list[T]) -> None:
-        self.events = sorted(events, key=lambda a: a['time'])
+        self.events = sorted(events, key=lambda a: a["time"])
         self.events_num = len(self.events)
         self.last_sampled_time = 0
         self.last_sampled_index = 0
 
     def get(self, idx: int):
-        return self.events[idx]['time'], self.events[idx]['x'], self.events[idx]['y'], self.events[idx]['keys']
+        return (
+            self.events[idx]["time"],
+            self.events[idx]["x"],
+            self.events[idx]["y"],
+            self.events[idx]["keys"],
+        )
 
     def sample_mouse(self, target_time_ms: float = 0) -> Z:
-        if target_time_ms <= self.events[0]['time']:
+        if target_time_ms <= self.events[0]["time"]:
             return self.events[0]
 
-        if target_time_ms >= self.events[self.events_num - 1]['time']:
+        if target_time_ms >= self.events[self.events_num - 1]["time"]:
             return self.events[self.events_num - 1]
 
         # search_range = range(self.last_sampled_index,self.events_num - 1) if self.last_sampled_time <= target_time_ms else reversed(range(self.last_sampled_index + 1,0))
         # for i in search_range:
         search_range = range(0, self.events_num - 1)
         for i in search_range:
-            cur_time = self.events[i]['time']
-            next_time = self.events[i + 1]['time']
+            cur_time = self.events[i]["time"]
+            next_time = self.events[i + 1]["time"]
             if cur_time <= target_time_ms <= next_time:
-                events_dist = (next_time - cur_time)
+                events_dist = next_time - cur_time
 
-                target_time_dist = (target_time_ms - cur_time)
+                target_time_dist = target_time_ms - cur_time
                 alpha = target_time_dist / events_dist
                 a = self.events[i]
                 b = self.events[i + 1]
                 self.last_sampled_index = i
                 self.last_sampled_time = target_time_ms
-                return cur_time, a["x"] + ((b['x'] - a['x']) * alpha), a["y"] + ((b['y'] - a['y']) * alpha)
+                return (
+                    cur_time,
+                    a["x"] + ((b["x"] - a["x"]) * alpha),
+                    a["y"] + ((b["y"] - a["y"]) * alpha),
+                )
 
         raise BaseException("NO SAMPLE FOUND")
 
     def sample_keys(self, target_time_ms: float = 0) -> Z:
-        if target_time_ms <= self.events[0]['time']:
+        if target_time_ms <= self.events[0]["time"]:
             return self.events[0]
 
-        if target_time_ms >= self.events[self.events_num - 1]['time']:
+        if target_time_ms >= self.events[self.events_num - 1]["time"]:
             return self.events[self.events_num - 1]
 
         # search_range = range(self.last_sampled_index,self.events_num - 1) if self.last_sampled_time <= target_time_ms else reversed(range(self.last_sampled_index + 1,0))
         # for i in search_range:
         search_range = range(0, self.events_num - 1)
         for i in search_range:
-            cur_time = self.events[i]['time']
-            next_time = self.events[i + 1]['time']
+            cur_time = self.events[i]["time"]
+            next_time = self.events[i + 1]["time"]
             if cur_time <= target_time_ms <= next_time:
-                events_dist = (next_time - cur_time)
+                events_dist = next_time - cur_time
 
-                target_time_dist = (target_time_ms - cur_time)
+                target_time_dist = target_time_ms - cur_time
                 alpha = target_time_dist / events_dist
                 a = self.events[i]
                 b = self.events[i + 1]
                 self.last_sampled_index = i
                 self.last_sampled_time = target_time_ms
-                return cur_time, b["keys"] if alpha >= 0.5 else a['keys']
+                return cur_time, b["keys"] if alpha >= 0.5 else a["keys"]
 
         raise BaseException("NO SAMPLE FOUND")
 
 
 class KeysSampler:
     def __init__(self, keys_events: list) -> None:
-        self.events = sorted(keys_events, key=lambda a: a['time'])
+        self.events = sorted(keys_events, key=lambda a: a["time"])
         self.events_num = len(self.events)
         self.last_sampled_time = 0
         self.last_sampled_index = 0
 
     def get(self, idx: int):
-        return self.events[idx]['time'], self.events[idx]['keys']
+        return self.events[idx]["time"], self.events[idx]["keys"]
 
-    def sample(self, target_time_ms: float = 0, key_press_allowance_ms=6) -> list[float, tuple]:
-        if target_time_ms <= self.events[0]['time']:
+    def sample(
+        self, target_time_ms: float = 0, key_press_allowance_ms=6
+    ) -> list[float, tuple]:
+        if target_time_ms <= self.events[0]["time"]:
             return self.events[0]
 
-        if target_time_ms >= self.events[self.events_num - 1]['time']:
+        if target_time_ms >= self.events[self.events_num - 1]["time"]:
             return self.events[self.events_num - 1]
 
         # search_range = range(self.last_sampled_index,self.events_num - 1) if self.last_sampled_time <= target_time_ms else reversed(range(self.last_sampled_index + 1,0))
@@ -137,9 +153,9 @@ class KeysSampler:
             if event_keys[0] or event_keys[1]:
                 last_idx_with_press = i
             if event_time <= target_time_ms <= next_event_time:
-                events_dist = (next_event_time - event_time)
+                events_dist = next_event_time - event_time
 
-                target_time_dist = (target_time_ms - event_time)
+                target_time_dist = target_time_ms - event_time
                 alpha = target_time_dist / events_dist
                 self.last_sampled_index = i
                 self.last_sampled_time = target_time_ms
@@ -155,7 +171,6 @@ class KeysSampler:
 
                 dist_last_press = target_time_ms - self.get(last_idx_with_press)[0]
                 if next_idx_with_press != -1:
-
                     dist_next_press = self.get(next_idx_with_press)[0] - target_time_ms
 
                     if dist_last_press < dist_next_press:
@@ -178,20 +193,33 @@ def run_file(file_path: str):
     process.communicate()
     return process.returncode
 
-def derive_capture_params(window_width=1920, window_height=1080):
+
+def derive_capture_params(
+    window_width=SCREEN_WIDTH,
+    window_height=SCREEN_HEIGHT,
+):
     osu_play_field_ratio = 3 / 4
-    capture_height= int(window_height * CAPTURE_HEIGHT_PERCENT)
+    capture_height = int(window_height * CAPTURE_HEIGHT_PERCENT)
     capture_width = int(capture_height / osu_play_field_ratio)
-    capture_params = [capture_width, capture_height,
-                      int((window_width - capture_width) / 2), int((window_height - capture_height) / 2)]
+    capture_params = [
+        capture_width,
+        capture_height,
+        int((window_width - capture_width) / 2),
+        int((window_height - capture_height) / 2),
+    ]
 
     return capture_params
 
-def playfield_coords_to_screen(playfield_x,playfield_y,screen_w=1920,screen_h=1080,account_for_capture_params = False):
-    
 
+def playfield_coords_to_screen(
+    playfield_x,
+    playfield_y,
+    screen_w=SCREEN_WIDTH,
+    screen_h=SCREEN_HEIGHT,
+    account_for_capture_params=False,
+):
     play_field_ratio = 4 / 3
-    screen_ratio = screen_w  / screen_h
+    screen_ratio = screen_w / screen_h
 
     play_field_factory_width = 512
     play_field_factory_height = play_field_factory_width / play_field_ratio
@@ -205,11 +233,11 @@ def playfield_coords_to_screen(playfield_x,playfield_y,screen_w=1920,screen_h=10
     screen_y = playfield_y * (screen_h / factory_h)
 
     if account_for_capture_params:
-        cap_x,cap_y,cap_dx,cap_dy = derive_capture_params(screen_w,screen_h)
+        cap_x, cap_y, cap_dx, cap_dy = derive_capture_params(screen_w, screen_h)
         screen_dx = screen_dx - cap_dx
         screen_dy = screen_dy - cap_dy
 
-    return [screen_x,screen_y,screen_dx,screen_dy]
+    return [screen_x, screen_y, screen_dx, screen_dy]
 
 
 """
@@ -260,33 +288,31 @@ def refresh_model_list():
     if not os.path.exists(MODELS_DIR):
         os.makedirs(MODELS_DIR)
         return
-    
-    for model_id in os.listdir(MODELS_DIR):
 
+    for model_id in os.listdir(MODELS_DIR):
         model_path = os.path.join(MODELS_DIR, model_id)
 
-        with open(os.path.join(model_path, 'info.json'), 'r') as f:
+        with open(os.path.join(model_path, "info.json"), "r") as f:
             data = json.load(f)
 
             payload = {
-                'id': model_id,
-                'name': data['name'],
-                'date': datetime.strptime(data['date'], "%Y-%m-%d %H:%M:%S.%f"),
-                'channels': data['channels'],
-                'datasets': data['datasets']
+                "id": model_id,
+                "name": data["name"],
+                "date": datetime.strptime(data["date"], "%Y-%m-%d %H:%M:%S.%f"),
+                "channels": data["channels"],
+                "datasets": data["datasets"],
             }
 
-            if data['type'] == EModelType.Aim.value:
+            if data["type"] == EModelType.Aim.value:
                 AIM_MODELS.append(payload)
-            elif data['type'] == EModelType.Actions.value:
+            elif data["type"] == EModelType.Actions.value:
                 CLICKS_MODELS.append(payload)
-            elif data['type'] == EModelType.Combined.value:
+            elif data["type"] == EModelType.Combined.value:
                 COMBINED_MODELS.append(payload)
 
-    AIM_MODELS = sorted(AIM_MODELS, key=lambda a: 0 - a['date'].timestamp())
-    CLICKS_MODELS = sorted(CLICKS_MODELS, key=lambda a: 0 - a['date'].timestamp())
-    COMBINED_MODELS = sorted(COMBINED_MODELS,
-                             key=lambda a: 0 - a['date'].timestamp())
+    AIM_MODELS = sorted(AIM_MODELS, key=lambda a: 0 - a["date"].timestamp())
+    CLICKS_MODELS = sorted(CLICKS_MODELS, key=lambda a: 0 - a["date"].timestamp())
+    COMBINED_MODELS = sorted(COMBINED_MODELS, key=lambda a: 0 - a["date"].timestamp())
 
 
 refresh_model_list()
@@ -308,11 +334,14 @@ def get_datasets() -> list[str]:
     return listdir(RAW_DATA_DIR)
 
 
-def get_validated_input(prompt="You forgot to put your own prompt",
-                        validate_fn: Callable[[str], bool] = lambda a: len(a.strip()) != 0,
-                        conversion_fn: Callable[[str], T] = lambda a: a.strip(),
-                        on_validation_error: Callable[[str], None] = lambda
-                                a: print("Invalid input, please try again.")) -> T:
+def get_validated_input(
+    prompt="You forgot to put your own prompt",
+    validate_fn: Callable[[str], bool] = lambda a: len(a.strip()) != 0,
+    conversion_fn: Callable[[str], T] = lambda a: a.strip(),
+    on_validation_error: Callable[[str], None] = lambda a: print(
+        "Invalid input, please try again."
+    ),
+) -> T:
     input_as_str = input(prompt)
 
     if not validate_fn(input_as_str):
@@ -365,7 +394,9 @@ class OsuSocketServer:
         self.active = True
         self.sock.bind(("127.0.0.1", 11000))
         self.osu_game = ("127.0.0.1", 12000)
-        self.active_thread = Thread(group=None, target=self.receive_messages, daemon=True)
+        self.active_thread = Thread(
+            group=None, target=self.receive_messages, daemon=True
+        )
         self.active_thread.start()
 
     def __enter__(self):
@@ -376,7 +407,7 @@ class OsuSocketServer:
         self.kill()
 
     def on_message_internal(self, message):
-        message_id, content = message.split('|')
+        message_id, content = message.split("|")
         if content == "MAP_BEGIN" or content == "MAP_END":
             self.on_state_updated(content)
             return
@@ -398,8 +429,7 @@ class OsuSocketServer:
                 break
 
     def send(self, message: str):
-        self.sock.sendto(
-            f"NONE|{message}".encode("utf-8"), self.osu_game)
+        self.sock.sendto(f"NONE|{message}".encode("utf-8"), self.osu_game)
 
     def cancel_send_and_wait(self, m_id, value):
         if m_id in self.pending_messages.keys():
@@ -413,11 +443,13 @@ class OsuSocketServer:
         task = asyncio.Future()
         message_id = f"{MESSAGES_SENT}"
         MESSAGES_SENT += 1
-        self.pending_messages[message_id] = task, loop, Timer(timeout, self.cancel_send_and_wait, [
-            message_id, timeout_value])
+        self.pending_messages[message_id] = (
+            task,
+            loop,
+            Timer(timeout, self.cancel_send_and_wait, [message_id, timeout_value]),
+        )
         self.pending_messages[message_id][2].start()
-        self.sock.sendto(
-            f"{message_id}|{message}".encode("utf-8"), self.osu_game)
+        self.sock.sendto(f"{message_id}|{message}".encode("utf-8"), self.osu_game)
         result = await task
         return result
 
@@ -453,8 +485,7 @@ class ScreenRecorder(Thread):
 
                 while frame is not None:
                     frame = np.array(frame)
-                    cv2.imwrite(
-                        path.join(record_dir, f'{frames_saved}.png'), frame)
+                    cv2.imwrite(path.join(record_dir, f"{frames_saved}.png"), frame)
                     frames_saved += 1
                     frame = write_buff.get()
 
@@ -472,12 +503,11 @@ class ScreenRecorder(Thread):
             write_thread.join()
 
             files = os.listdir(record_dir)
-            files.sort(key=lambda a: int(a.split('.')[0]))
+            files.sort(key=lambda a: int(a.split(".")[0]))
 
             source = cv2.VideoWriter_fourcc(*"MJPG")
 
-            writer = cv2.VideoWriter(
-                filename, source, float(self.fps), (1920, 1080))
+            writer = cv2.VideoWriter(filename, source, float(self.fps), (1920, 1080))
 
             for file in tqdm(files, desc=f"Generating Video from {len(files)} frames."):
                 writer.write(cv2.imread(path.join(record_dir, file)))

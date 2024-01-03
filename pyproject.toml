@@ -10,20 +10,21 @@ python = "^3.9"
 
 keyboard= "^0.13.5"
 numpy= "^1.24.3"
-torch= "^2.0.1"
-torchvision= "^0.15.2"
+torch= "^2.1.2"
+torchvision= "^0.16.2"
 tqdm= "^4.64.1"
 opencv-python= "^4.7.0.72"
 mss= "^9.0.1"
 timm= "^0.9.2"
 mouse = "^0.7.1"
+screeninfo = "^0.8.1"
 
 [tool.poetry.dev-dependencies]
 poethepoet = "^0.20.0"
 
 [tool.poe.tasks]
 uninstall-torch = "pip uninstall -y torch torchvision"
-install-torch-cuda = "pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118"
+install-torch-cuda = "pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cu118"
 force-cuda = ["uninstall-torch","install-torch-cuda"]
 use-win32 = "pip install pywin32"
 
